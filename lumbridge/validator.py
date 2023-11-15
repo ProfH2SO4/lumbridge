@@ -2,7 +2,7 @@ import os
 
 from .exc import WrongInputPath, WrongFile, MissingFile
 
-__all__ = ["check_input_structure"]
+__all__ = ["check_input_structure", "check_strands_in_orf_file"]
 
 
 def find_missing_file(file_name_fasta_no_ending: list[str],
@@ -73,6 +73,17 @@ def check_input_structure(fasta_path: str, gff3_path: str, orf_path: str) -> Non
                                                      file_name_orf_no_ending)
 
         raise MissingFile(missing_files=ret_missing)
+
+
+def check_strands_in_orf_file(file_path) -> bool:
+    """ Check if ORF file contains ORFs from both strands. """
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line.startswith('>'):
+                if ':c' in line:
+                    return True  # Found an ORF from the reverse strand
+    return False  # No ORF from the reverse strand found
+
 
 def check_orf_presents(fasta_path: str, orf_path: str):
     pass

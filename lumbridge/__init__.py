@@ -1,7 +1,8 @@
 from types import ModuleType
 from os.path import isfile
 
-from .validator import check_input_structure
+from .common import create_output_orf_forward_strand, find_gff3_and_orf_intervals, find_poly_adi_sequences
+from .validator import check_input_structure, check_strands_in_orf_file
 import config
 
 
@@ -43,12 +44,20 @@ def run():
     # Load Config
     config_: ModuleType = load_config()
     parsed_config: dict[str, any] = parse_namespace(config_)
+    print("------ Check if all files provided -------")
     check_input_structure(parsed_config["INPUT_FASTA"], parsed_config["INPUT_GFF3"], parsed_config["INPUT_ORF"])
-    print("------ All files provided -------")
 
+    print("------ Create file with ORF only on forward strand  -------")
+    create_output_orf_forward_strand(parsed_config["INPUT_ORF"], parsed_config["OUTPUT_FOLDER"])
+    print("------ Find ORf overlaps in GFF3 file  -------")
+    find_gff3_and_orf_intervals(f"{parsed_config['OUTPUT_FOLDER']}/orf_folder_forward_strand",
+                                parsed_config["INPUT_GFF3"],
+                                f"{parsed_config['OUTPUT_FOLDER']}")
 
+    print("------ Find Polyadenylation sequences in Fasta file  -------")
+    find_poly_adi_sequences(parsed_config["INPUT_FASTA"], parsed_config['OUTPUT_FOLDER'])
 
-
+    print("------ Done  -------")
 
 
 
