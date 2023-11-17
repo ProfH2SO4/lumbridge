@@ -3,6 +3,7 @@ from os.path import isfile
 
 from .common import create_output_orf_forward_strand, find_gff3_and_orf_intervals, find_poly_adi_sequences
 from .validator import check_input_structure, check_strands_in_orf_file
+from .homer2 import annotate_homer2_motifs
 import config
 
 
@@ -53,10 +54,15 @@ def run():
     find_gff3_and_orf_intervals(f"{parsed_config['OUTPUT_FOLDER']}/orf_folder_forward_strand",
                                 parsed_config["INPUT_GFF3"],
                                 f"{parsed_config['OUTPUT_FOLDER']}")
-
     print("------ Find Polyadenylation sequences in Fasta file  -------")
     find_poly_adi_sequences(parsed_config["INPUT_FASTA"], parsed_config['OUTPUT_FOLDER'])
-
+    print("Annotate homer2 output2 to fasta")
+    annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
+                           parsed_config["INPUT_GFF3"],
+                           parsed_config["HOMER2_OUTPUT_FOLDER"],
+                           parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                           parsed_config["HOMER2_P_THRESHOLD"],
+                           output_folder=parsed_config['OUTPUT_FOLDER'])
     print("------ Done  -------")
 
 

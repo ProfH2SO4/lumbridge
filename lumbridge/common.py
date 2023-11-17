@@ -24,15 +24,17 @@ def parse_orf_file(orf_file):
 
 
 # Function to parse GFF3 data
-def parse_gff3_file(gff3_file):
+def parse_gff3_file(gff3_file) -> list[tuple[int, int]]:
     genes = []
     with open(gff3_file, 'r') as file:
         for line in file:
             if not line.startswith('#') and '\tgene\t' in line:
                 parts = line.split('\t')
-                start = int(parts[3])
-                end = int(parts[4])
-                genes.append((start, end))
+                strand = parts[6]
+                if strand == '+':  # Check if the gene is on the positive strand
+                    start = int(parts[3])
+                    end = int(parts[4])
+                    genes.append((start, end))
     return genes
 
 
