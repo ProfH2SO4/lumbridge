@@ -35,27 +35,29 @@ def get_motif_files_with_tolerance(motif_path_folder: str,
 
 
 def get_position_in_fasta(fasta_file_path: str, start_intervals: list[int], end_intervals: list[int],
-                          sequences: list[str]) -> list[tuple[int, int]]:
-    ret: list[tuple[int, int]] = []
+                          sequences: list[tuple[str, str]]) -> list[tuple[int, int, str, str]]:
+    ret: list[tuple[int, int, str, str]] = []
     for record in SeqIO.parse(fasta_file_path, "fasta"):
-        for start_interval, end_interval, seq in zip(start_intervals, end_intervals, sequences):
+        for start_interval, end_interval in zip(start_intervals, end_intervals):
             subsequence = str(record.seq[start_interval - 1:end_interval])
-            position = subsequence.find(seq)
-            if position != -1:
-                ret.append((start_interval + position,start_interval + position + len(seq) - 1 ))
+            for seq in sequences:
+                position = subsequence.find(seq[0])
+                if position != -1:
+                    ret.append((start_interval + (position -1), start_interval + (position -1) + len(seq[0]) - 1, seq[0], seq[1]))
     return ret
 
 
 def write_to_output_folder(output_folder: str,
                            file_body: str,
-                           interval_pos: list[tuple[int, int]],
-                           ret_homer_motifs: list[tuple[str, str]]):
+                           lines: list[tuple[int, int, str, str]],
+                           ):
     homer2_output_path: str = f"{output_folder}/homer2"
     create_folder(homer2_output_path)
     with open(f"{homer2_output_path}/{file_body}.txt",'w') as file:
         file.write("start\tend\tp_value\tseq\n")
-        for interval, motif in zip(interval_pos, ret_homer_motifs):
-            file.write(f"{interval[0]}\t{interval[1]}\t{motif[0]}\t{motif[1]}\n")
+        for interval in lines:
+            file.write(f"{interval[0]}\t{interval[1]}\t{interval[3]}\t{interval[2]}\n")
+
 
 def annotate_homer2_motifs(fasta_folder_path: str,
                            gff3_folder_path: str,
@@ -67,7 +69,7 @@ def annotate_homer2_motifs(fasta_folder_path: str,
     homer2_folder_post_fix: str = "_homer2"
     # /motifResults/knownResults
     for file in os.listdir(gff3_folder_path):
-        ret: list[tuple[int, int]] = parse_gff3_file(f"{gff3_folder_path}/{file}")  # all gene intervals
+        gene_boundary: list[tuple[int, int]] = parse_gff3_file(f"{gff3_folder_path}/{file}")  # all gene intervals
         name_part, _ = os.path.splitext(file)
         # open homer2
         homer_folder_path: str = f"{homer2_folder_path}/{name_part}{homer2_folder_post_fix}"
@@ -76,10 +78,10 @@ def annotate_homer2_motifs(fasta_folder_path: str,
                                                                                       p_threshold=p_threshold)
         # open fasta
         fasta_file_path: str = f"{fasta_folder_path}/{name_part}.fasta"
-        ret: list[tuple[int, int]] = get_position_in_fasta(fasta_file_path,
-                              [i[0] - sequence_len_before_gene for i in ret],
-                              [i[1] - sequence_len_before_gene for i in ret],
-                              [i[0] for i in ret_homer_motifs])
-        write_to_output_folder(output_folder, name_part, ret, ret_homer_motifs)
+        ret: list[tuple[int, int, str, str]] = get_position_in_fasta(fasta_file_path,
+                              [i[0] - sequence_len_before_gene -1 for i in gene_boundary],
+                              [i[0] - 1 for i in gene_boundary],
+                              ret_homer_motifs)
+        write_to_output_folder(output_folder, name_part, ret)
 
 
