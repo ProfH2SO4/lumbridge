@@ -1,13 +1,15 @@
 import os
 from Bio import SeqIO
 
-from .common import parse_gff3_file, create_folder
+from .common import parse_gff3_file, create_folder, extract_promoters_to_bed, get_fasta_from_bed, create_genome_file
 
-__all__ = ["annotate_homer2_motifs"]
+
+__all__ = ["annotate_homer2_motifs", "make_homer2_output"]
 
 
 def is_value_lower(value_to_check: float, upper_bound: float) -> bool:
     return value_to_check <= upper_bound
+
 
 def get_motif_files_with_tolerance(motif_path_folder: str,
                                    max_tolerated_ambiguity: int = 0,
@@ -51,9 +53,9 @@ def write_to_output_folder(output_folder: str,
                            file_body: str,
                            lines: list[tuple[int, int, str, str]],
                            ):
-    homer2_output_path: str = f"{output_folder}/homer2"
+    homer2_output_path: str = f"{output_folder}/homer2_annotation"
     create_folder(homer2_output_path)
-    with open(f"{homer2_output_path}/{file_body}.txt",'w') as file:
+    with open(f"{homer2_output_path}/{file_body}.txt", 'w') as file:
         file.write("start\tend\tp_value\tseq\n")
         for interval in lines:
             file.write(f"{interval[0]}\t{interval[1]}\t{interval[3]}\t{interval[2]}\n")
@@ -84,4 +86,21 @@ def annotate_homer2_motifs(fasta_folder_path: str,
                               ret_homer_motifs)
         write_to_output_folder(output_folder, name_part, ret)
 
+
+def make_homer2_output(fasta_folder_path: str,
+                       gff3_folder_path: str,
+                       homer2_output_folder_path: str,
+                       sequence_len_before_gene: int
+                       ):
+    for file in os.listdir(gff3_folder_path):
+        name_part, _ = os.path.splitext(file)
+        out_path: str = f"{homer2_output_folder_path}/{name_part}_promoter.bed"
+        extract_promoters_to_bed(f"{gff3_folder_path}/{file}", out_path, sequence_len_before_gene)  # all gene positive intervals
+        # -----
+        fasta_path: str = f"{fasta_folder_path}/{name_part}.fasta"
+        promoter_fasta_path: str = f"{homer2_output_folder_path}/{name_part}_promoter.fasta"
+        get_fasta_from_bed(fasta_path, out_path, promoter_fasta_path)
+        output_genome: str = f"{homer2_output_folder_path}/{name_part}.genome"
+        create_genome_file(fasta_path, output_genome)
+    pass
 

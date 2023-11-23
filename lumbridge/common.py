@@ -1,5 +1,6 @@
 import os
-
+import pybedtools
+import pysam
 
 def create_folder(new_folder_path: str) -> None:
     if not os.path.isdir(new_folder_path):
@@ -9,6 +10,7 @@ def create_folder(new_folder_path: str) -> None:
         except OSError as error:
             print(f"Creation of the directory {new_folder_path} failed due to: {error}")
             raise error
+
 
 # Function to parse ORF data
 def parse_orf_file(orf_file):
@@ -36,6 +38,20 @@ def parse_gff3_file(gff3_file) -> list[tuple[int, int]]:
                     end = int(parts[4])
                     genes.append((start, end))
     return genes
+
+
+def extract_promoters_to_bed(gff3_file: str, output_bed_file: str, sequence_len_before_gene: int):
+    with open(gff3_file, 'r') as gff, open(output_bed_file, 'w') as bed:
+        for line in gff:
+            if line.startswith('#') or '\tgene\t' not in line:
+                continue
+
+            parts = line.strip().split('\t')
+            if parts[6] == '+':
+                start = max(int(parts[3]) - sequence_len_before_gene, 0)
+                end = int(parts[3])
+                name = "Promoter_" + parts[8]
+                bed.write(f"{parts[0]}\t{start}\t{end}\t{name}\t{parts[5]}\t{parts[6]}\n")
 
 
 def get_overlap_type(orf_start: int, orf_end: int, gene_start: int, gene_end: int) -> int:
@@ -150,6 +166,24 @@ def find_poly_adi_sequences(fasta_folder_path: str, output_folder_path: str) -> 
     create_folder(poly_adi_output_folder_path)
     for filename in os.listdir(fasta_folder_path):
         ending_fasta: str = ".fasta"
-        filename_body: str = filename[:-len(ending_fasta)]
-        poly_adil_file_path = f"{poly_adi_output_folder_path}/{filename_body}.txt"
-        write_poly_adi_seq(f"{fasta_folder_path}/{filename}", poly_adil_file_path)
+        if filename.endswith(ending_fasta):
+            filename_body: str = filename[:-len(ending_fasta)]
+            poly_adil_file_path = f"{poly_adi_output_folder_path}/{filename_body}.txt"
+            write_poly_adi_seq(f"{fasta_folder_path}/{filename}", poly_adil_file_path)
+
+
+def get_fasta_from_bed(fasta_file: str, bed_file: str, output_fasta: str):
+    bed = pybedtools.BedTool(bed_file)
+    fasta = bed.sequence(fi=fasta_file, name=True, fo=output_fasta)
+
+
+def create_genome_file(fasta_path: str, output_file: str):
+    # Index the fasta file
+    pysam.faidx(fasta_path)
+
+    # Read the .fai file and write the first two columns to the output file
+    fai_file = fasta_path + '.fai'
+    with open(fai_file, 'r') as fai, open(output_file, 'w') as out:
+        for line in fai:
+            parts = line.split('\t')
+            out.write(f"{parts[0]}\t{parts[1]}\n")

@@ -3,9 +3,8 @@ from os.path import isfile
 
 from .common import create_output_orf_forward_strand, find_gff3_and_orf_intervals, find_poly_adi_sequences
 from .validator import check_input_structure, check_strands_in_orf_file
-from .homer2 import annotate_homer2_motifs
+from .homer2 import annotate_homer2_motifs, make_homer2_output
 import config
-
 
 __version__ = "0.0.1"
 __started_at__ = "2023-10-25T20:00:00"
@@ -56,15 +55,17 @@ def run():
                                 f"{parsed_config['OUTPUT_FOLDER']}")
     print("------ Find Polyadenylation sequences in Fasta file  -------")
     find_poly_adi_sequences(parsed_config["INPUT_FASTA"], parsed_config['OUTPUT_FOLDER'])
-    print("Annotate homer2 output2 to fasta")
-    annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
-                           parsed_config["INPUT_GFF3"],
-                           parsed_config["HOMER2_OUTPUT_FOLDER"],
-                           parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
-                           parsed_config["HOMER2_P_THRESHOLD"],
-                           output_folder=parsed_config['OUTPUT_FOLDER'])
+    print("------ Make homer2 output -------")
+    make_homer2_output(parsed_config["INPUT_FASTA"],
+                       parsed_config["INPUT_GFF3"],
+                       parsed_config["HOMER2_OUTPUT_FOLDER"],
+                       parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                       )
+    # print("------ Annotate homer2 output to fasta -------")
+    # annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
+    #                        parsed_config["INPUT_GFF3"],
+    #                        parsed_config["HOMER2_OUTPUT_FOLDER"],
+    #                        parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+    #                        parsed_config["HOMER2_P_THRESHOLD"],
+    #                        output_folder=parsed_config['OUTPUT_FOLDER'])
     print("------ Done  -------")
-
-
-
-

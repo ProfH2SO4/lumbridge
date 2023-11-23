@@ -1,1 +1,2 @@
 bio >= 1.6
+pybedtools >= 0.9

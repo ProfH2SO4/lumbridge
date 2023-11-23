@@ -45,11 +45,13 @@ def check_input_structure(fasta_path: str, gff3_path: str, orf_path: str) -> Non
     #Enter fasta Folder
     for filename in os.listdir(fasta_path):
         ending = ".fasta"
+        fai_ending = ".fai"
         if not os.path.isfile(os.path.join(fasta_path, filename)):
             continue
-        if not filename.endswith(ending):
+        if not (filename.endswith(ending) or filename.endswith(fai_ending)):
             raise WrongFile(path=os.path.join(fasta_path, filename), expected_ending=ending)
-        file_name_fasta_no_ending.append(filename[:-len(ending)])
+        if filename.endswith(ending):
+            file_name_fasta_no_ending.append(filename[:-len(ending)])
 
     for filename in os.listdir(gff3_path):
         ending = ".gff3"

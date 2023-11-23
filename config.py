@@ -4,6 +4,6 @@ INPUT_ORF = "/home/matej/Documents/private/transformer_project/root_files/orf_fo
 OUTPUT_FOLDER = "/home/matej/Documents/private/transformer_project/lumbridge_output"
 
 # Homer2
-HOMER2_OUTPUT_FOLDER = "/home/matej/Documents/private/transformer_project/homer2"
+HOMER2_OUTPUT_FOLDER = "/home/matej/Documents/private/transformer_project/lumbridge_output/homer2"
 HOMER2_SEQUENCE_LEN_BEFORE_GENE = 1000
 HOMER2_P_THRESHOLD = 0.05
