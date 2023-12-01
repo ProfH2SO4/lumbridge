@@ -1,4 +1,6 @@
 import os
+import pybedtools
+import subprocess
 from Bio import SeqIO
 
 from .common import parse_gff3_file, create_folder, extract_promoters_to_bed, get_fasta_from_bed, create_genome_file
@@ -68,14 +70,14 @@ def annotate_homer2_motifs(fasta_folder_path: str,
                            p_threshold: float,
                            output_folder: str
                            ):
-    homer2_folder_post_fix: str = "_homer2"
+    homer2_folder_post_fix: str = "_output_dir"
     # /motifResults/knownResults
     for file in os.listdir(gff3_folder_path):
         gene_boundary: list[tuple[int, int]] = parse_gff3_file(f"{gff3_folder_path}/{file}")  # all gene intervals
         name_part, _ = os.path.splitext(file)
         # open homer2
         homer_folder_path: str = f"{homer2_folder_path}/{name_part}{homer2_folder_post_fix}"
-        homer_known_motif_path: str = f"{homer_folder_path}/motifResults/knownResults"
+        homer_known_motif_path: str = f"{homer_folder_path}/knownResults"
         ret_homer_motifs: list[tuple[str, str]] = get_motif_files_with_tolerance(homer_known_motif_path,
                                                                                       p_threshold=p_threshold)
         # open fasta
@@ -87,10 +89,38 @@ def annotate_homer2_motifs(fasta_folder_path: str,
         write_to_output_folder(output_folder, name_part, ret)
 
 
+def create_background_file(fasta_path: str, genome_file: str, promoter_bed_path: str, homer2_output_background_path: str, homer2_output_folder: str, sequence_len_before_gene: int):
+    # Create random intervals and save to a file
+    random_intervals = pybedtools.BedTool().random(l=sequence_len_before_gene, n=10000, g=genome_file)
+    random_intervals.saveas(f'{homer2_output_folder}/random_intervals.bed')
+
+    # Subtract promoters from random intervals and save to a file
+    promoters = pybedtools.BedTool(promoter_bed_path)
+    background_intervals = random_intervals.subtract(promoters)
+    background_intervals.saveas(f'{homer2_output_folder}/background_intervals.bed')
+
+    # Get fasta sequences for the background intervals
+    background_intervals.sequence(fi=fasta_path, fo=homer2_output_background_path, name=True)
+
+
+def run_find_motifs(promoters_fasta: str, output_directory: str, background_fasta: str, cpu_cores: int):
+    # Set the PATH environment variable
+    homer_bin_path = "/home/matej/homer2/bin"
+    current_env = os.environ.copy()
+    current_env["PATH"] = homer_bin_path + os.pathsep + current_env["PATH"]
+
+    cmd = [
+        "findMotifs.pl", promoters_fasta, "fasta", output_directory,
+        "-len", "6,8,10", "-p", str(cpu_cores), "-fasta", background_fasta
+    ]
+    subprocess.run(cmd, env=current_env)
+
+
 def make_homer2_output(fasta_folder_path: str,
                        gff3_folder_path: str,
                        homer2_output_folder_path: str,
-                       sequence_len_before_gene: int
+                       sequence_len_before_gene: int,
+                       cpu_cores: int,
                        ):
     for file in os.listdir(gff3_folder_path):
         name_part, _ = os.path.splitext(file)
@@ -102,5 +132,9 @@ def make_homer2_output(fasta_folder_path: str,
         get_fasta_from_bed(fasta_path, out_path, promoter_fasta_path)
         output_genome: str = f"{homer2_output_folder_path}/{name_part}.genome"
         create_genome_file(fasta_path, output_genome)
-    pass
+        background_fasta_path: str = f"{homer2_output_folder_path}/{name_part}_background.fasta"
+        create_background_file(fasta_path, output_genome, out_path, background_fasta_path, homer2_output_folder_path, sequence_len_before_gene)
+        output_dir_path: str = f"{homer2_output_folder_path}/{name_part}_output_dir"
+        run_find_motifs(promoter_fasta_path, output_dir_path, background_fasta_path, cpu_cores=cpu_cores)
+
 

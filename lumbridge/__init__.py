@@ -60,12 +60,13 @@ def run():
                        parsed_config["INPUT_GFF3"],
                        parsed_config["HOMER2_OUTPUT_FOLDER"],
                        parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                       cpu_cores=parsed_config["HOMER2_CPU_CORES"],
                        )
-    # print("------ Annotate homer2 output to fasta -------")
-    # annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
-    #                        parsed_config["INPUT_GFF3"],
-    #                        parsed_config["HOMER2_OUTPUT_FOLDER"],
-    #                        parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
-    #                        parsed_config["HOMER2_P_THRESHOLD"],
-    #                        output_folder=parsed_config['OUTPUT_FOLDER'])
+    print("------ Annotate homer2 output to fasta -------")
+    annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
+                           parsed_config["INPUT_GFF3"],
+                           parsed_config["HOMER2_OUTPUT_FOLDER"],
+                           parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                           parsed_config["HOMER2_P_THRESHOLD"],
+                           output_folder=parsed_config['OUTPUT_FOLDER'])
     print("------ Done  -------")
