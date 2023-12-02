@@ -2,6 +2,10 @@ import os
 import pybedtools
 import pysam
 
+from Bio import SeqIO
+from orffinder import orffinder
+
+
 def create_folder(new_folder_path: str) -> None:
     if not os.path.isdir(new_folder_path):
         try:
@@ -126,23 +130,35 @@ def create_one_strand_orf_file(orf_path: str, output_dir: str) -> None:
             # Write lines that belong to the forward strand ORF
             if write_lines:
                 new_file.write(line)
+def extract_positive_elements_gff3(gff3_folder: str, output_folder_path: str) -> None:
+    create_folder(output_folder_path)
+
+    for filename in os.listdir(gff3_folder):
+        if filename.endswith('.gff3'):  # Ensures processing only GFF3 files
+            input_path = os.path.join(gff3_folder, filename)
+            output_path = os.path.join(output_folder_path, filename)
+
+            with open(input_path, 'r') as infile, open(output_path, 'w') as outfile:
+                for line in infile:
+                    fields = line.strip().split('\t')
+                    if line.startswith('#') or (len(fields) > 6 and fields[6] == '+'):
+                        outfile.write(line)
 
 
 def create_output_orf_forward_strand(input_orf_folder_path: str, output_folder_path: str) -> None:
-    orf_output_folder: str = "orf_folder_forward_strand"
-    new_folder_path: str = f"{output_folder_path}/{orf_output_folder}"
-    if not os.path.isdir(new_folder_path):
+
+    if not os.path.isdir(output_folder_path):
         try:
-            os.mkdir(new_folder_path)
-            print(f"Directory {new_folder_path} created successfully.")
+            os.mkdir(output_folder_path)
+            print(f"Directory {output_folder_path} created successfully.")
         except OSError as error:
-            print(f"Creation of the directory {new_folder_path} failed due to: {error}")
+            print(f"Creation of the directory {output_folder_path} failed due to: {error}")
             raise error
 
     for filename in os.listdir(input_orf_folder_path):
         ending = ".cds"
         if filename.endswith(ending):
-            create_one_strand_orf_file(f"{input_orf_folder_path}/{filename}", new_folder_path)
+            create_one_strand_orf_file(f"{input_orf_folder_path}/{filename}", output_folder_path)
 
 
 def write_poly_adi_seq(fasta_file_path: str, poly_adil_path: str) -> None:
@@ -162,7 +178,7 @@ def write_poly_adi_seq(fasta_file_path: str, poly_adil_path: str) -> None:
 
 def find_poly_adi_sequences(fasta_folder_path: str, output_folder_path: str) -> None:
     """ Find Polyadenylation sequences """
-    poly_adi_output_folder_path: str = f"{output_folder_path}/termination"
+    poly_adi_output_folder_path: str = f"{output_folder_path}/poly_adenylation"
     create_folder(poly_adi_output_folder_path)
     for filename in os.listdir(fasta_folder_path):
         ending_fasta: str = ".fasta"
@@ -187,3 +203,4 @@ def create_genome_file(fasta_path: str, output_file: str):
         for line in fai:
             parts = line.split('\t')
             out.write(f"{parts[0]}\t{parts[1]}\n")
+

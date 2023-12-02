@@ -89,15 +89,17 @@ def annotate_homer2_motifs(fasta_folder_path: str,
         write_to_output_folder(output_folder, name_part, ret)
 
 
-def create_background_file(fasta_path: str, genome_file: str, promoter_bed_path: str, homer2_output_background_path: str, homer2_output_folder: str, sequence_len_before_gene: int):
+def create_background_file(fasta_path: str, genome_file: str, promoter_bed_path: str,
+                           homer2_output_background_path: str,
+                           homer2_output_folder: str, sequence_len_before_gene: int, file_name: str):
     # Create random intervals and save to a file
     random_intervals = pybedtools.BedTool().random(l=sequence_len_before_gene, n=10000, g=genome_file)
-    random_intervals.saveas(f'{homer2_output_folder}/random_intervals.bed')
+    random_intervals.saveas(f'{homer2_output_folder}/{file_name}_random_intervals.bed')
 
     # Subtract promoters from random intervals and save to a file
     promoters = pybedtools.BedTool(promoter_bed_path)
     background_intervals = random_intervals.subtract(promoters)
-    background_intervals.saveas(f'{homer2_output_folder}/background_intervals.bed')
+    background_intervals.saveas(f'{homer2_output_folder}/{file_name}_background_intervals.bed')
 
     # Get fasta sequences for the background intervals
     background_intervals.sequence(fi=fasta_path, fo=homer2_output_background_path, name=True)
@@ -122,6 +124,7 @@ def make_homer2_output(fasta_folder_path: str,
                        sequence_len_before_gene: int,
                        cpu_cores: int,
                        ):
+    create_folder(homer2_output_folder_path)
     for file in os.listdir(gff3_folder_path):
         name_part, _ = os.path.splitext(file)
         out_path: str = f"{homer2_output_folder_path}/{name_part}_promoter.bed"
@@ -133,7 +136,9 @@ def make_homer2_output(fasta_folder_path: str,
         output_genome: str = f"{homer2_output_folder_path}/{name_part}.genome"
         create_genome_file(fasta_path, output_genome)
         background_fasta_path: str = f"{homer2_output_folder_path}/{name_part}_background.fasta"
-        create_background_file(fasta_path, output_genome, out_path, background_fasta_path, homer2_output_folder_path, sequence_len_before_gene)
+        create_background_file(fasta_path, output_genome, out_path,
+                               background_fasta_path,
+                               homer2_output_folder_path, sequence_len_before_gene, name_part)
         output_dir_path: str = f"{homer2_output_folder_path}/{name_part}_output_dir"
         run_find_motifs(promoter_fasta_path, output_dir_path, background_fasta_path, cpu_cores=cpu_cores)
 

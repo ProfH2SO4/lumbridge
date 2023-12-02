@@ -26,47 +26,47 @@ def find_missing_file(file_name_fasta_no_ending: list[str],
     }
 
 
-def check_input_structure(fasta_path: str, gff3_path: str, orf_path: str) -> None:
+def check_input_structure(fasta_folder: str, gff3_folder: str, orf_folder: str) -> None:
     """
     Check content of fasta_folder, gff3_folder, orf_folder
     :return:
     """
-    if not (os.path.exists(fasta_path) and os.path.isdir(fasta_path)):
-        raise WrongInputPath(fasta_path)
-    if not (os.path.exists(gff3_path) and os.path.isdir(gff3_path)):
-        raise WrongInputPath(gff3_path)
-    if not (os.path.exists(orf_path) and os.path.isdir(orf_path)):
-        raise WrongInputPath(orf_path)
+    if not (os.path.exists(fasta_folder) and os.path.isdir(fasta_folder)):
+        raise WrongInputPath(fasta_folder)
+    if not (os.path.exists(gff3_folder) and os.path.isdir(gff3_folder)):
+        raise WrongInputPath(gff3_folder)
+    if not (os.path.exists(orf_folder) and os.path.isdir(orf_folder)):
+        raise WrongInputPath(orf_folder)
 
     file_name_fasta_no_ending: list[str] = []
     file_name_gff3_no_ending: list[str] = []
     file_name_orf_no_ending: list[str] = []
 
     #Enter fasta Folder
-    for filename in os.listdir(fasta_path):
+    for filename in os.listdir(fasta_folder):
         ending = ".fasta"
         fai_ending = ".fai"
-        if not os.path.isfile(os.path.join(fasta_path, filename)):
+        if not os.path.isfile(os.path.join(fasta_folder, filename)):
             continue
         if not (filename.endswith(ending) or filename.endswith(fai_ending)):
-            raise WrongFile(path=os.path.join(fasta_path, filename), expected_ending=ending)
+            raise WrongFile(path=os.path.join(fasta_folder, filename), expected_ending=ending)
         if filename.endswith(ending):
             file_name_fasta_no_ending.append(filename[:-len(ending)])
 
-    for filename in os.listdir(gff3_path):
+    for filename in os.listdir(gff3_folder):
         ending = ".gff3"
-        if not os.path.isfile(os.path.join(gff3_path, filename)):
+        if not os.path.isfile(os.path.join(gff3_folder, filename)):
             continue
         if not filename.endswith(ending):
-            raise WrongFile(path=os.path.join(gff3_path, filename), expected_ending=ending)
+            raise WrongFile(path=os.path.join(gff3_folder, filename), expected_ending=ending)
         file_name_gff3_no_ending.append(filename[:-len(ending)])
 
-    for filename in os.listdir(orf_path):
+    for filename in os.listdir(orf_folder):
         ending = ".cds"
-        if not os.path.isfile(os.path.join(orf_path, filename)):
+        if not os.path.isfile(os.path.join(orf_folder, filename)):
             continue
         if not filename.endswith(ending):
-            raise WrongFile(path=os.path.join(orf_path, filename), expected_ending=ending)
+            raise WrongFile(path=os.path.join(orf_folder, filename), expected_ending=ending)
         file_name_orf_no_ending.append(filename[:-len(ending)])
 
     if not (len(file_name_fasta_no_ending) == len(file_name_gff3_no_ending) == len(file_name_orf_no_ending)):
@@ -85,10 +85,6 @@ def check_strands_in_orf_file(file_path) -> bool:
                 if ':c' in line:
                     return True  # Found an ORF from the reverse strand
     return False  # No ORF from the reverse strand found
-
-
-def check_orf_presents(fasta_path: str, orf_path: str):
-    pass
 
 
 
