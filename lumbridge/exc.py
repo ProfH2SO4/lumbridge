@@ -23,4 +23,3 @@ class MissingFile(LumbridgeException):
     def __init__(self, missing_files: dict[str, set[str]]):
         message = f"The input has missing files: {missing_files}"
         super().__init__(message)
-

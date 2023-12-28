@@ -1,10 +1,18 @@
 from types import ModuleType
 from os.path import isfile
+import os
 
-from .common import create_output_orf_forward_strand, find_gff3_and_orf_intervals, find_poly_adi_sequences, extract_positive_elements_gff3
+from .common import (
+    create_output_orf_forward_strand,
+    find_gff3_and_orf_intervals,
+    find_poly_adi_sequences,
+    extract_positive_elements_gff3,
+)
 from .validator import check_input_structure, check_strands_in_orf_file
 from .homer2 import annotate_homer2_motifs, make_homer2_output
+
 import config
+import log
 
 __version__ = "0.0.1"
 __last_update__ = "2023-10-25T20:00:00"
@@ -38,9 +46,21 @@ def parse_namespace(config_: ModuleType) -> dict[str, any]:
     """
     parsed: dict[str, any] = {}
     for key, value in config_.__dict__.items():
-        if not key.startswith('__'):
+        if not key.startswith("__"):
             parsed[key] = value
     return parsed
+
+
+def create_file_if_not_exists(path_to_file: str) -> None:
+    # Check if the directory exists, and create it if it doesn't
+    directory = os.path.dirname(path_to_file)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Check if the file exists, and create it if it doesn't
+    if not os.path.exists(path_to_file):
+        with open(path_to_file, "w") as file:
+            pass  # Create an empty file
 
 
 def run() -> None:
@@ -48,41 +68,60 @@ def run() -> None:
     config_: ModuleType = load_config()
     parsed_config: dict[str, any] = parse_namespace(config_)
 
-    print("------ Check if all files provided -------")
-    check_input_structure(parsed_config["INPUT_FASTA"], parsed_config["INPUT_GFF3"], parsed_config["INPUT_ORF"])
+    print("============ Setting Up Logger ============")
+    if parsed_config["LOG_CONFIG"]["handlers"].get("file", None):
+        file_path: str = parsed_config["LOG_CONFIG"]["handlers"]["file"].get("filename")
+        create_file_if_not_exists(file_path)
+    log.set_up_logger(parsed_config["LOG_CONFIG"])
 
-    print("------ Extract gff3 positive elements  -------")
-    gff3_folder_pos_strand: str = f"{parsed_config['OUTPUT_FOLDER']}/gff3_positive_strand"
+    log.info("------ Check if all files provided -------")
+    check_input_structure(
+        parsed_config["INPUT_FASTA"],
+        parsed_config["INPUT_GFF3"],
+        parsed_config["INPUT_ORF"],
+    )
+
+    log.info("------ Extract gff3 positive elements  -------")
+    gff3_folder_pos_strand: str = (
+        f"{parsed_config['OUTPUT_FOLDER']}/gff3_positive_strand"
+    )
     extract_positive_elements_gff3(parsed_config["INPUT_GFF3"], gff3_folder_pos_strand)
 
-    print("------ Create file with ORF only on forward strand  -------")
-    orf_output_folder: str = f"{parsed_config['OUTPUT_FOLDER']}/orf_folder_positive_strand"
+    log.info("------ Create file with ORF only on forward strand  -------")
+    orf_output_folder: str = (
+        f"{parsed_config['OUTPUT_FOLDER']}/orf_folder_positive_strand"
+    )
     create_output_orf_forward_strand(parsed_config["INPUT_ORF"], orf_output_folder)
 
-    print("------ Find ORf overlaps in GFF3 file  -------")
-    find_gff3_and_orf_intervals(orf_output_folder,
-                                gff3_folder_pos_strand,
-                                f"{parsed_config['OUTPUT_FOLDER']}")
+    log.info("------ Find ORf overlaps in GFF3 file  -------")
+    find_gff3_and_orf_intervals(
+        orf_output_folder, gff3_folder_pos_strand, f"{parsed_config['OUTPUT_FOLDER']}"
+    )
 
-    print("------ Find Polyadenylation sequences in Fasta file  -------")
-    find_poly_adi_sequences(parsed_config["INPUT_FASTA"], parsed_config['OUTPUT_FOLDER'])
+    log.info("------ Find Polyadenylation sequences in Fasta file  -------")
+    find_poly_adi_sequences(
+        parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"]
+    )
 
-    print("------ Make homer2 output -------")
-    make_homer2_output(parsed_config["INPUT_FASTA"],
-                       gff3_folder_pos_strand,
-                       parsed_config["HOMER2_OUTPUT_FOLDER"],
-                       parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
-                       parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
-                       cpu_cores=parsed_config["HOMER2_CPU_CORES"],
-                       )
+    log.info("------ Make homer2 output -------")
+    make_homer2_output(
+        parsed_config["INPUT_FASTA"],
+        gff3_folder_pos_strand,
+        parsed_config["HOMER2_OUTPUT_FOLDER"],
+        parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+        parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
+        cpu_cores=parsed_config["HOMER2_CPU_CORES"],
+    )
 
-    print("------ Annotate homer2 output to fasta -------")
-    annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
-                           gff3_folder_pos_strand,
-                           parsed_config["HOMER2_OUTPUT_FOLDER"],
-                           parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
-                           parsed_config["HOMER2_P_THRESHOLD"],
-                           output_folder=parsed_config['OUTPUT_FOLDER'])
+    log.info("------ Annotate homer2 output to fasta -------")
+    annotate_homer2_motifs(
+        parsed_config["INPUT_FASTA"],
+        gff3_folder_pos_strand,
+        parsed_config["HOMER2_OUTPUT_FOLDER"],
+        parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+        parsed_config["HOMER2_P_THRESHOLD"],
+        output_folder=parsed_config["OUTPUT_FOLDER"],
+    )
 
+    log.info("------ Done  -------")
     print("------ Done  -------")
-
