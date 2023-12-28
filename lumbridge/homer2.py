@@ -38,7 +38,9 @@ def get_motif_files_with_tolerance(motif_path_folder: str,
     return motif_file_paths
 
 
-def get_position_in_fasta(fasta_file_path: str, start_intervals: list[int], end_intervals: list[int],
+def get_position_in_fasta(fasta_file_path: str,
+                          start_intervals: list[int],
+                          end_intervals: list[int],
                           sequences: list[tuple[str, str]]) -> list[tuple[int, int, str, str]]:
     ret: list[tuple[int, int, str, str]] = []
     for record in SeqIO.parse(fasta_file_path, "fasta"):
@@ -89,11 +91,17 @@ def annotate_homer2_motifs(fasta_folder_path: str,
         write_to_output_folder(output_folder, name_part, ret)
 
 
-def create_background_file(fasta_path: str, genome_file: str, promoter_bed_path: str,
+def create_background_file(fasta_path: str,
+                           genome_file: str,
+                           promoter_bed_path: str,
                            homer2_output_background_path: str,
-                           homer2_output_folder: str, sequence_len_before_gene: int, file_name: str):
+                           homer2_output_folder: str,
+                           sequence_len_before_gene_start: int,
+                           seq_len_after_inclusive_gene_start: int,
+                           file_name: str) -> None:
     # Create random intervals and save to a file
-    random_intervals = pybedtools.BedTool().random(l=sequence_len_before_gene, n=10000, g=genome_file)
+    len_of_seq: int = sequence_len_before_gene_start + seq_len_after_inclusive_gene_start
+    random_intervals = pybedtools.BedTool().random(l=len_of_seq, n=10000, g=genome_file)
     random_intervals.saveas(f'{homer2_output_folder}/{file_name}_random_intervals.bed')
 
     # Subtract promoters from random intervals and save to a file
@@ -121,25 +129,35 @@ def run_find_motifs(promoters_fasta: str, output_directory: str, background_fast
 def make_homer2_output(fasta_folder_path: str,
                        gff3_folder_path: str,
                        homer2_output_folder_path: str,
-                       sequence_len_before_gene: int,
+                       sequence_len_before_gene_start: int,
+                       sequence_len_after_gene_start: int,
                        cpu_cores: int,
-                       ):
+                       ) -> None:
     create_folder(homer2_output_folder_path)
     for file in os.listdir(gff3_folder_path):
         name_part, _ = os.path.splitext(file)
         out_path: str = f"{homer2_output_folder_path}/{name_part}_promoter.bed"
-        extract_promoters_to_bed(f"{gff3_folder_path}/{file}", out_path, sequence_len_before_gene)  # all gene positive intervals
-        # -----
         fasta_path: str = f"{fasta_folder_path}/{name_part}.fasta"
         promoter_fasta_path: str = f"{homer2_output_folder_path}/{name_part}_promoter.fasta"
-        get_fasta_from_bed(fasta_path, out_path, promoter_fasta_path)
         output_genome: str = f"{homer2_output_folder_path}/{name_part}.genome"
-        create_genome_file(fasta_path, output_genome)
         background_fasta_path: str = f"{homer2_output_folder_path}/{name_part}_background.fasta"
-        create_background_file(fasta_path, output_genome, out_path,
-                               background_fasta_path,
-                               homer2_output_folder_path, sequence_len_before_gene, name_part)
         output_dir_path: str = f"{homer2_output_folder_path}/{name_part}_output_dir"
+
+        extract_promoters_to_bed(f"{gff3_folder_path}/{file}",
+                                 out_path,
+                                 sequence_len_before_gene_start,
+                                 sequence_len_after_gene_start)  # all gene positive intervals
+        get_fasta_from_bed(fasta_path, out_path, promoter_fasta_path)
+        create_genome_file(fasta_path, output_genome)
+        create_background_file(fasta_path,
+                               output_genome,
+                               out_path,
+                               background_fasta_path,
+                               homer2_output_folder_path,
+                               sequence_len_before_gene_start,
+                               sequence_len_after_gene_start,
+                               name_part)
+
         run_find_motifs(promoter_fasta_path, output_dir_path, background_fasta_path, cpu_cores=cpu_cores)
 
 

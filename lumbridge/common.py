@@ -44,7 +44,10 @@ def parse_gff3_file(gff3_file) -> list[tuple[int, int]]:
     return genes
 
 
-def extract_promoters_to_bed(gff3_file: str, output_bed_file: str, sequence_len_before_gene: int):
+def extract_promoters_to_bed(gff3_file: str,
+                             output_bed_file: str,
+                             sequence_len_before_gene_start: int,
+                             seq_len_after_inclusive_gene_start: int) -> None:
     with open(gff3_file, 'r') as gff, open(output_bed_file, 'w') as bed:
         for line in gff:
             if line.startswith('#') or '\tgene\t' not in line:
@@ -52,9 +55,9 @@ def extract_promoters_to_bed(gff3_file: str, output_bed_file: str, sequence_len_
 
             parts = line.strip().split('\t')
             if parts[6] == '+':
-                start = max(int(parts[3]) - sequence_len_before_gene, 0)
-                end = int(parts[3])
-                name = "Promoter_" + parts[8]
+                start: int = max(int(parts[3]) - sequence_len_before_gene_start, 0)
+                end: int = int(parts[3]) + seq_len_after_inclusive_gene_start - 1
+                name: str = "Promoter_" + parts[8]
                 bed.write(f"{parts[0]}\t{start}\t{end}\t{name}\t{parts[5]}\t{parts[6]}\n")
 
 

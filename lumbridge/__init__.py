@@ -30,20 +30,20 @@ def load_config() -> ModuleType:
     return app_config
 
 
-def parse_namespace(config: ModuleType) -> dict[str, any]:
+def parse_namespace(config_: ModuleType) -> dict[str, any]:
     """
     Parse configuration file file to dict.
-    @param config: configuration file
+    @param config_: configuration file
     @return: parsed configuration file
     """
     parsed: dict[str, any] = {}
-    for key, value in config.__dict__.items():
+    for key, value in config_.__dict__.items():
         if not key.startswith('__'):
             parsed[key] = value
     return parsed
 
 
-def run():
+def run() -> None:
     # Load Config
     config_: ModuleType = load_config()
     parsed_config: dict[str, any] = parse_namespace(config_)
@@ -71,7 +71,8 @@ def run():
     make_homer2_output(parsed_config["INPUT_FASTA"],
                        gff3_folder_pos_strand,
                        parsed_config["HOMER2_OUTPUT_FOLDER"],
-                       parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                       parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+                       parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
                        cpu_cores=parsed_config["HOMER2_CPU_CORES"],
                        )
 
@@ -79,8 +80,9 @@ def run():
     annotate_homer2_motifs(parsed_config["INPUT_FASTA"],
                            gff3_folder_pos_strand,
                            parsed_config["HOMER2_OUTPUT_FOLDER"],
-                           parsed_config["HOMER2_SEQUENCE_LEN_BEFORE_GENE"],
+                           parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
                            parsed_config["HOMER2_P_THRESHOLD"],
                            output_folder=parsed_config['OUTPUT_FOLDER'])
 
     print("------ Done  -------")
+
