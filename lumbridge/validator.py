@@ -30,8 +30,17 @@ def find_missing_file(
 
 def check_input_structure(fasta_folder: str, gff3_folder: str, orf_folder: str) -> None:
     """
-    Check content of fasta_folder, gff3_folder, orf_folder
-    :return:
+    Check content of fasta_folder, gff3_folder, orf_folder.
+    All base names (arabidopsis_thaliana_ch_1) in folders must be same.
+    e.g
+    In fasta_folder arabidopsis_thaliana_ch_1.fasta
+    In gff3_folder arabidopsis_thaliana_ch_1.gff3
+    In orf_folder arabidopsis_thaliana_ch_1.cds
+
+    :fasta_folder: A path to fasta_folder
+    :gff3_folder: A path to gff3_folder
+    :orf_folder: A path to orf_folder
+    :return: None If ok else raise Error
     """
     if not (os.path.exists(fasta_folder) and os.path.isdir(fasta_folder)):
         raise WrongInputPath(fasta_folder)

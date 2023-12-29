@@ -85,10 +85,20 @@ def annotate_homer2_motifs(
     fasta_folder_path: str,
     gff3_folder_path: str,
     homer2_folder_path: str,
-    sequence_len_before_gene: int,
+    sequence_len_before_gene_start: int,
     p_threshold: float,
     output_folder: str,
-):
+) -> None:
+    """
+    Homer2 gives me motifs of promotors in desired sequences, but it does annotate them.
+    :param fasta_folder_path:
+    :param gff3_folder_path:
+    :param homer2_folder_path:
+    :param sequence_len_before_gene_start:
+    :param p_threshold:
+    :param output_folder:
+    :return:
+    """
     homer2_folder_post_fix: str = "_output_dir"
     # /motifResults/knownResults
     for file in os.listdir(gff3_folder_path):
@@ -108,7 +118,7 @@ def annotate_homer2_motifs(
         fasta_file_path: str = f"{fasta_folder_path}/{name_part}.fasta"
         ret: list[tuple[int, int, str, str]] = get_position_in_fasta(
             fasta_file_path,
-            [i[0] - sequence_len_before_gene - 1 for i in gene_boundary],
+            [i[0] - sequence_len_before_gene_start - 1 for i in gene_boundary],
             [i[0] - 1 for i in gene_boundary],
             ret_homer_motifs,
         )
@@ -176,6 +186,16 @@ def make_homer2_output(
     sequence_len_after_gene_start: int,
     cpu_cores: int,
 ) -> None:
+    """
+
+    :param fasta_folder_path:
+    :param gff3_folder_path:
+    :param homer2_output_folder_path:
+    :param sequence_len_before_gene_start: if 200, and gene_start at pos 1000 => [1000- 200, 1000)
+    :param sequence_len_after_gene_start: if 200, and gene_start at pos 1000 => [1000, 1000 + 200)
+    :param cpu_cores:
+    :return:
+    """
     create_folder(homer2_output_folder_path)
     for file in os.listdir(gff3_folder_path):
         name_part, _ = os.path.splitext(file)

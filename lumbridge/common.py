@@ -5,14 +5,18 @@ import pysam
 from Bio import SeqIO
 from orffinder import orffinder
 
+import log
+
 
 def create_folder(new_folder_path: str) -> None:
     if not os.path.isdir(new_folder_path):
         try:
             os.mkdir(new_folder_path)
-            print(f"Directory {new_folder_path} created successfully.")
+            log.info(f"Directory {new_folder_path} created successfully.")
         except OSError as error:
-            print(f"Creation of the directory {new_folder_path} failed due to: {error}")
+            log.error(
+                f"Creation of the directory {new_folder_path} failed due to: {error}"
+            )
             raise error
 
 
@@ -66,7 +70,10 @@ def extract_promoters_to_bed(
 
 
 def get_overlap_type(
-    orf_start: int, orf_end: int, gene_start: int, gene_end: int
+    orf_start: int,
+    orf_end: int,
+    gene_start: int,
+    gene_end: int,
 ) -> int:
     """
     None = 0
@@ -83,7 +90,15 @@ def get_overlap_type(
     return 0
 
 
-def is_orf_in_gene(orf, genes) -> int | tuple[int, int, int]:
+def is_orf_in_gene(
+    orf: tuple[int, int], genes: list[tuple[int, int]]
+) -> int | tuple[int, int, int]:
+    """
+    Find ORF in gene boundaries.
+    :param orf:
+    :param genes:
+    :return: gen_start, gen_end, overlap_type if found else 0
+    """
     for gene in genes:
         overlap_type: int = get_overlap_type(orf[0], orf[1], gene[0], gene[1])
         if overlap_type != 0:
@@ -91,8 +106,16 @@ def is_orf_in_gene(orf, genes) -> int | tuple[int, int, int]:
     return 0
 
 
-# Main function to write intervals to a file
 def write_orf_gff3_intervals(orf_file: str, gff3_file: str, output_file: str) -> None:
+    """
+    Snippet:
+    ORF_Start	ORF_End	GFF3_Start	GFF3_End	In_Gene
+    127	261	-	-	0
+    :param orf_file:
+    :param gff3_file:
+    :param output_file:
+    :return: None
+    """
     orfs: list[tuple[int, int]] = parse_orf_file(orf_file)
     genes: list[tuple[int, int]] = parse_gff3_file(gff3_file)
 
@@ -109,15 +132,24 @@ def write_orf_gff3_intervals(orf_file: str, gff3_file: str, output_file: str) ->
 
 
 def find_gff3_and_orf_intervals(
-    path_orf_folder: str, path_gff3_folder: str, path_output_dir: str
+    path_orf_folder: str,
+    path_gff3_folder: str,
+    path_output_dir: str,
 ) -> None:
-    """Find orf in gff3's genes."""
+    """
+    Find orf in gff3's genes. Create a file which contains info if ORF (no, in, partially) in gene.
+    :param path_orf_folder:
+    :param path_gff3_folder:
+    :param path_output_dir:
+    :return: None
+    """
+    create_folder(path_output_dir)
     for filename in os.listdir(path_gff3_folder):
-        ending_gff3: str = ".gff3"
-        ending_cds: str = ".cds"
-        filename_body: str = filename[: -len(ending_gff3)]
-        filename_orf: str = f"{path_orf_folder}/{filename_body}{ending_cds}"
-        file_name_output: str = f"{filename_body}_orf_in_gff3.txt"
+        extension_gff3: str = ".gff3"
+        extension_cds: str = ".cds"
+        filename_base: str = filename[: -len(extension_gff3)]
+        filename_orf: str = f"{path_orf_folder}/{filename_base}{extension_cds}"
+        file_name_output: str = f"{filename_base}.txt"
         write_orf_gff3_intervals(
             filename_orf,
             f"{path_gff3_folder}/{filename}",
@@ -164,15 +196,21 @@ def extract_positive_elements_gff3(gff3_folder: str, output_folder_path: str) ->
 
 
 def create_output_orf_forward_strand(
-    input_orf_folder_path: str, output_folder_path: str
+    input_orf_folder_path: str,
+    output_folder_path: str,
 ) -> None:
-
+    """
+    Create orf_folder in output and save there only orf from forward strand.
+    :param input_orf_folder_path: A Path to the input_orf_folder.
+    :param output_folder_path: A Path to the output_orf_folder.
+    :return: None if OK else Raise Error
+    """
     if not os.path.isdir(output_folder_path):
         try:
             os.mkdir(output_folder_path)
-            print(f"Directory {output_folder_path} created successfully.")
+            log.debug(f"Directory {output_folder_path} created successfully.")
         except OSError as error:
-            print(
+            log.error(
                 f"Creation of the directory {output_folder_path} failed due to: {error}"
             )
             raise error
