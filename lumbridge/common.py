@@ -2,22 +2,16 @@ import os
 import pybedtools
 import pysam
 
-from Bio import SeqIO
-from orffinder import orffinder
-
 import log
 
 
 def create_folder(new_folder_path: str) -> None:
-    if not os.path.isdir(new_folder_path):
-        try:
-            os.mkdir(new_folder_path)
-            log.info(f"Directory {new_folder_path} created successfully.")
-        except OSError as error:
-            log.error(
-                f"Creation of the directory {new_folder_path} failed due to: {error}"
-            )
-            raise error
+    try:
+        os.makedirs(new_folder_path, exist_ok=True)
+        log.info(f"Directory {new_folder_path} created successfully.")
+    except OSError as error:
+        log.error(f"Creation of the directory {new_folder_path} failed due to: {error}")
+        raise
 
 
 # Function to parse ORF data

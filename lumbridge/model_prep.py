@@ -51,7 +51,9 @@ def write_fasta_file(fasta_file: str, model_file: str, vector_base: list[int]):
                         vector_count = 0  # Reset the counter
 
 
-def write_promotor_motifs_file(promotor_file: str, model_file: str) -> None:
+def write_promotor_motifs_file(
+    promotor_file: str, model_file: str, position_to_write: int
+) -> None:
     # Step 1: Read promoter file and get start and end positions
     promoter_positions = set()
     with open(promotor_file, "r") as pf:
@@ -60,23 +62,26 @@ def write_promotor_motifs_file(promotor_file: str, model_file: str) -> None:
             start, end, _, _ = line.strip().split("\t")
             promoter_positions.update(range(int(start), int(end) + 1))
 
-    # Step 2: Update the model file in place
-    with open(model_file, "r+") as mf:
+    # Step 2: Update the model file based on ORF positions
+    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
+        mode="w", delete=False
+    ) as temp_file:
         vector_count = 0  # Counter for the position of each vector
-        lines = mf.readlines()
-        for line in lines:
+        for line in mf:
             if line.startswith("#"):
-                mf.write(line)
+                temp_file.write(line)  # Write header lines as is
                 continue
             vectors = eval(line.strip())
             updated_line = []
-            for vector in vectors:
+            for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in promoter_positions:
-                    vector[4] = 1  # Set promoter motif indicator to 1
+                    vector[position_to_write] = 1
                 updated_line.append(str(vector))
-            print(line)
-            mf.write(",".join(updated_line) + "\n")
+            temp_file.write(",".join(updated_line) + "\n")
+
+    # Step 3: Replace the old model file with the updated temporary file
+    os.replace(temp_file.name, model_file)
 
 
 def write_gff3_file(gff3_file: str, model_file: str) -> None:
@@ -142,6 +147,71 @@ def write_gff3_file(gff3_file: str, model_file: str) -> None:
         os.replace(temp_file.name, model_file)
 
 
+def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> None:
+    # Step 1: Read ORF file and get start and end positions for ORFs within genes
+    orf_positions = set()
+    with open(orf_file, "r") as of:
+        next(of)  # Skip header
+        for line in of:
+            parts = line.strip().split("\t")
+            if parts[4] != "0":  # Check if 'In_Gene' is not '0'
+                start, end = int(parts[0]), int(parts[1])
+                orf_positions.update(range(start, end + 1))
+
+    # Step 2: Update the model file based on ORF positions
+    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
+        mode="w", delete=False
+    ) as temp_file:
+        vector_count = 0  # Counter for the position of each vector
+        for line in mf:
+            if line.startswith("#"):
+                temp_file.write(line)  # Write header lines as is
+                continue
+            vectors = eval(line.strip())
+            updated_line = []
+            for index, vector in enumerate(vectors):
+                vector_count += 1
+                if vector_count in orf_positions:
+                    vector[position_to_write] = 1
+                updated_line.append(str(vector))
+            temp_file.write(",".join(updated_line) + "\n")
+
+    # Step 3: Replace the old model file with the updated temporary file
+    os.replace(temp_file.name, model_file)
+
+
+def write_poly_adenyl_file(
+    poly_adenyl_file: str, model_file: str, position_to_write: int
+) -> None:
+    poly_adenyl = set()
+    with open(poly_adenyl_file, "r") as of:
+        next(of)  # Skip header
+        for line in of:
+            parts = line.strip().split("\t")
+            start, end = int(parts[0]), int(parts[1])
+            poly_adenyl.update(range(start, end + 1))
+
+    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
+        mode="w", delete=False
+    ) as temp_file:
+        vector_count = 0  # Counter for the position of each vector
+        for line in mf:
+            if line.startswith("#"):
+                temp_file.write(line)  # Write header lines as is
+                continue
+            vectors = eval(line.strip())
+            updated_line = []
+            for index, vector in enumerate(vectors):
+                vector_count += 1
+                if vector_count in poly_adenyl:
+                    vector[position_to_write] = 1
+                updated_line.append(str(vector))
+            temp_file.write(",".join(updated_line) + "\n")
+
+    # Step 3: Replace the old model file with the updated temporary file
+    os.replace(temp_file.name, model_file)
+
+
 def transform_data_to_vectors(
     fasta_folder: str,
     gff3_folder: str,
@@ -176,6 +246,8 @@ def transform_data_to_vectors(
         create_file_header(output_file, bp_vector_schema)
         write_fasta_file(f"{fasta_folder}/{filename}", output_file, bp_vector)
         write_promotor_motifs_file(
-            f"{promotor_motifs_folder}/{base_part}.txt", output_file
+            f"{promotor_motifs_folder}/{base_part}.txt", output_file, 4
         )
         write_gff3_file(f"{gff3_folder}/{base_part}.gff3", output_file)
+        write_orf_file(f"{orf_folder}/{base_part}.txt", output_file, 5)
+        write_poly_adenyl_file(f"{poly_adenyl_folder}/{base_part}.txt", output_file, 11)
