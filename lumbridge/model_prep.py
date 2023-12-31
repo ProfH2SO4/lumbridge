@@ -1,9 +1,16 @@
 import os, tempfile
+from enum import Enum
 from datetime import datetime
 
 from .common import create_folder
 
 __all__ = ["transform_data_to_vectors"]
+
+
+class WriteRule(Enum):
+    START = 1
+    MIDDLE = 2
+    END = 3
 
 
 def create_file_header(path_to_file: str, bp_vector_schema: list[str]) -> None:
@@ -55,14 +62,17 @@ def write_promotor_motifs_file(
     promotor_file: str, model_file: str, position_to_write: int
 ) -> None:
     # Step 1: Read promoter file and get start and end positions
-    promoter_positions = set()
+    promoter_positions = {}
     with open(promotor_file, "r") as pf:
         next(pf)  # Skip header
         for line in pf:
             start, end, _, _ = line.strip().split("\t")
-            promoter_positions.update(range(int(start), int(end) + 1))
+            promoter_positions[start] = (WriteRule.START, end)
+            for pos in range(start + 1, end):
+                promoter_positions[pos] = (WriteRule.MIDDLE, None)
+            promoter_positions[end] = (WriteRule.END, None)
 
-    # Step 2: Update the model file based on ORF positions
+    # Step 2: Update the model file based on promoter positions
     with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
         mode="w", delete=False
     ) as temp_file:
@@ -76,7 +86,8 @@ def write_promotor_motifs_file(
             for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in promoter_positions:
-                    vector[position_to_write] = 1
+                    promoter_type, _ = promoter_positions[vector_count]
+                    vector[position_to_write] = promoter_type.value
                 updated_line.append(str(vector))
             temp_file.write(",".join(updated_line) + "\n")
 
@@ -149,14 +160,23 @@ def write_gff3_file(gff3_file: str, model_file: str) -> None:
 
 def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> None:
     # Step 1: Read ORF file and get start and end positions for ORFs within genes
-    orf_positions = set()
+    orf_positions = {}
     with open(orf_file, "r") as of:
         next(of)  # Skip header
         for line in of:
             parts = line.strip().split("\t")
             if parts[4] != "0":  # Check if 'In_Gene' is not '0'
                 start, end = int(parts[0]), int(parts[1])
-                orf_positions.update(range(start, end + 1))
+                # Add ORF rules as a list for each position
+                for pos in range(start, end + 1):
+                    orf_rule = (
+                        WriteRule.START
+                        if pos == start
+                        else WriteRule.END
+                        if pos == end
+                        else WriteRule.MIDDLE
+                    )
+                    orf_positions.setdefault(pos, []).append(orf_rule.value)
 
     # Step 2: Update the model file based on ORF positions
     with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
@@ -172,24 +192,28 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
             for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in orf_positions:
-                    vector[position_to_write] = 1
+                    # Assign a list of ORF rules to the position
+                    vector[position_to_write] = orf_positions[vector_count]
                 updated_line.append(str(vector))
             temp_file.write(",".join(updated_line) + "\n")
 
-    # Step 3: Replace the old model file with the updated temporary file
+    # Replace the old model file with the updated temporary file
     os.replace(temp_file.name, model_file)
 
 
 def write_poly_adenyl_file(
     poly_adenyl_file: str, model_file: str, position_to_write: int
 ) -> None:
-    poly_adenyl = set()
+    poly_adenyl = {}
     with open(poly_adenyl_file, "r") as of:
         next(of)  # Skip header
         for line in of:
             parts = line.strip().split("\t")
             start, end = int(parts[0]), int(parts[1])
-            poly_adenyl.update(range(start, end + 1))
+            poly_adenyl[start] = (WriteRule.START, end)
+            for pos in range(start + 1, end):
+                poly_adenyl[pos] = (WriteRule.MIDDLE, None)
+            poly_adenyl[end] = (WriteRule.END, None)
 
     with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
         mode="w", delete=False
@@ -204,11 +228,12 @@ def write_poly_adenyl_file(
             for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in poly_adenyl:
-                    vector[position_to_write] = 1
+                    poly_type, _ = poly_adenyl[vector_count]
+                    vector[position_to_write] = poly_type.value
                 updated_line.append(str(vector))
             temp_file.write(",".join(updated_line) + "\n")
 
-    # Step 3: Replace the old model file with the updated temporary file
+    # Replace the old model file with the updated temporary file
     os.replace(temp_file.name, model_file)
 
 

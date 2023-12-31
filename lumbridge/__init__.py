@@ -37,9 +37,10 @@ def load_config(test_config_path: None | str) -> ModuleType:
     app_config: ModuleType = config
     path: str = "/etc/lumbridge/config.py"
 
-    if not isfile(path):
+    if not isfile(path) and not test_config_path:
         return app_config
-    compile_config(app_config, path)
+    if isfile(path):
+        compile_config(app_config, path)
     if test_config_path:
         compile_config(app_config, test_config_path)
     return app_config
@@ -102,24 +103,24 @@ def run(test_config: str | None = None) -> None:
 
     log.info("------ Find ORf overlaps in GFF3 file  -------")
     orf_in_gff3_folder: str = f"{parsed_config['OUTPUT_FOLDER']}/orf_in_gff3"
-    find_gff3_and_orf_intervals(
-        orf_output_folder, gff3_folder_pos_strand, orf_in_gff3_folder
-    )
+    # find_gff3_and_orf_intervals(
+    #     orf_output_folder, gff3_folder_pos_strand, orf_in_gff3_folder
+    # )
 
     log.info("------ Find Polyadenylation sequences in Fasta file  -------")
-    find_poly_adi_sequences(
-        parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"]
-    )
+    # find_poly_adi_sequences(
+    #     parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"]
+    # )
 
     log.info("------ Make homer2 output -------")
-    make_homer2_output(
-        parsed_config["INPUT_FASTA"],
-        gff3_folder_pos_strand,
-        parsed_config["HOMER2_OUTPUT_FOLDER"],
-        parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
-        parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
-        cpu_cores=parsed_config["HOMER2_CPU_CORES"],
-    )
+    # make_homer2_output(
+    #     parsed_config["INPUT_FASTA"],
+    #     gff3_folder_pos_strand,
+    #     parsed_config["HOMER2_OUTPUT_FOLDER"],
+    #     parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+    #     parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
+    #     cpu_cores=parsed_config["HOMER2_CPU_CORES"],
+    # )
 
     log.info("------ Annotate homer2 output to fasta -------")
     annotate_homer2_motifs(

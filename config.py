@@ -1,6 +1,6 @@
-INPUT_FASTA = "/home/matej/Documents/private/lumbridge_project/root_files/fasta_folder"
-INPUT_GFF3 = "/home/matej/Documents/private/lumbridge_project/root_files/gff3_folder"
-INPUT_ORF = "/home/matej/Documents/private/lumbridge_project/root_files/orf_folder"
+INPUT_FASTA = "/home/matej/git/lumbridge/test_data/fasta_folder"
+INPUT_GFF3 = "/home/matej/git/lumbridge/test_data/gff3_folder"
+INPUT_ORF = "/home/matej/git/lumbridge/test_data/orf_folder"
 OUTPUT_FOLDER = "/home/matej/Documents/private/lumbridge_project/lumbridge_output"
 
 # Homer2
