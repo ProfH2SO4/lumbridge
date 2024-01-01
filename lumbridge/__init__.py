@@ -113,14 +113,14 @@ def run(test_config: str | None = None) -> None:
     )
 
     log.info("------ Make homer2 output -------")
-    # make_homer2_output(
-    #     parsed_config["INPUT_FASTA"],
-    #     gff3_folder_pos_strand,
-    #     parsed_config["HOMER2_OUTPUT_FOLDER"],
-    #     parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
-    #     parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
-    #     cpu_cores=parsed_config["HOMER2_CPU_CORES"],
-    # )
+    make_homer2_output(
+        parsed_config["INPUT_FASTA"],
+        gff3_folder_pos_strand,
+        parsed_config["HOMER2_OUTPUT_FOLDER"],
+        parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+        parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
+        cpu_cores=parsed_config["HOMER2_CPU_CORES"],
+    )
 
     log.info("------ Annotate homer2 output to fasta -------")
     annotate_homer2_motifs(
