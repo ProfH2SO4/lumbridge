@@ -103,14 +103,14 @@ def run(test_config: str | None = None) -> None:
 
     log.info("------ Find ORf overlaps in GFF3 file  -------")
     orf_in_gff3_folder: str = f"{parsed_config['OUTPUT_FOLDER']}/orf_in_gff3"
-    # find_gff3_and_orf_intervals(
-    #     orf_output_folder, gff3_folder_pos_strand, orf_in_gff3_folder
-    # )
+    find_gff3_and_orf_intervals(
+        orf_output_folder, gff3_folder_pos_strand, orf_in_gff3_folder
+    )
 
     log.info("------ Find Polyadenylation sequences in Fasta file  -------")
-    # find_poly_adi_sequences(
-    #     parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"]
-    # )
+    find_poly_adi_sequences(
+        parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"]
+    )
 
     log.info("------ Make homer2 output -------")
     # make_homer2_output(
@@ -128,6 +128,7 @@ def run(test_config: str | None = None) -> None:
         gff3_folder_pos_strand,
         parsed_config["HOMER2_OUTPUT_FOLDER"],
         parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+        parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
         parsed_config["HOMER2_P_THRESHOLD"],
         output_folder=parsed_config["OUTPUT_FOLDER"],
     )

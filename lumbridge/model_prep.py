@@ -13,6 +13,14 @@ class WriteRule(Enum):
     END = 3
 
 
+def parse_line(line):
+    parts = line.strip().split("\t")
+    start = int(parts[0])
+    end = int(parts[1])
+    # The rest of the parts can be processed as needed, depending on their expected types
+    return start, end, parts[2:]
+
+
 def create_file_header(path_to_file: str, bp_vector_schema: list[str]) -> None:
     header_: str = (
         "#HEADER#\n"
@@ -48,14 +56,16 @@ def write_fasta_file(fasta_file: str, model_file: str, vector_base: list[int]):
             for char in line.strip():
                 vector = nucleotide_to_vector.get(char.upper(), None)
                 if vector:
-                    # Write the vector to the model file
-                    model.write(f"{vector},")
                     vector_count += 1
 
-                    # Check if 5 vectors have been written, then start a new line
+                    # Write the vector to the model file
                     if vector_count == 5:
-                        model.write("\n")  # Start a new line
-                        vector_count = 0  # Reset the counter
+                        # At the fifth vector, write it followed by a newline and reset the counter
+                        model.write(f"{vector}\n")
+                        vector_count = 0
+                    else:
+                        # Otherwise, write the vector followed by a tab
+                        model.write(f"{vector}\t")
 
 
 def write_promotor_motifs_file(
@@ -66,11 +76,11 @@ def write_promotor_motifs_file(
     with open(promotor_file, "r") as pf:
         next(pf)  # Skip header
         for line in pf:
-            start, end, _, _ = line.strip().split("\t")
-            promoter_positions[start] = (WriteRule.START, end)
+            start, end, other_parts = parse_line(line)
+            promoter_positions.setdefault(start, []).append(WriteRule.START)
             for pos in range(start + 1, end):
-                promoter_positions[pos] = (WriteRule.MIDDLE, None)
-            promoter_positions[end] = (WriteRule.END, None)
+                promoter_positions.setdefault(pos, []).append(WriteRule.MIDDLE)
+            promoter_positions.setdefault(end, []).append(WriteRule.END)
 
     # Step 2: Update the model file based on promoter positions
     with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
@@ -81,36 +91,24 @@ def write_promotor_motifs_file(
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
-            vectors = eval(line.strip())
+            vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
             for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in promoter_positions:
-                    promoter_type, _ = promoter_positions[vector_count]
-                    vector[position_to_write] = promoter_type.value
+                    # Combine all promoter types for this position
+                    promoter_types = promoter_positions[vector_count]
+                    vector[position_to_write] = [rule.value for rule in promoter_types]
                 updated_line.append(str(vector))
-            temp_file.write(",".join(updated_line) + "\n")
+            temp_file.write("\t".join(updated_line) + "\n")
 
     # Step 3: Replace the old model file with the updated temporary file
     os.replace(temp_file.name, model_file)
 
 
-def write_gff3_file(gff3_file: str, model_file: str) -> None:
-    bp_vector_schema: list[str] = [
-        "A",
-        "C",
-        "G",
-        "T",
-        "PROMOTOR_MOTIF",
-        "exon",
-        "mRNA",
-        "miRNA",
-        "rRNA",
-        "CDS",
-        "POLY_ADENYL",
-        "gene",
-    ]
-
+def write_gff3_file(
+    gff3_file: str, model_file: str, bp_vector_schema: list[str]
+) -> None:
     # Initialize dictionaries to store positions for each feature
     feature_positions = {
         feature: {}
@@ -127,35 +125,43 @@ def write_gff3_file(gff3_file: str, model_file: str) -> None:
             feature_type = parts[2]
             if feature_type in feature_positions:
                 start, end = int(parts[3]), int(parts[4])
+                # Append feature status to lists at each position
                 for pos in range(start, end + 1):
-                    feature_positions[feature_type][pos] = 2  # Mark as within feature
-                feature_positions[feature_type][start] = 1  # Mark start of feature
-                feature_positions[feature_type][end] = 3  # Mark end of feature
+                    feature_positions[feature_type].setdefault(pos, []).append(
+                        WriteRule.MIDDLE.value
+                    )
+                feature_positions[feature_type].setdefault(start, []).append(
+                    WriteRule.START.value
+                )
+                feature_positions[feature_type].setdefault(end, []).append(
+                    WriteRule.END.value
+                )
 
-        # Open the model file for reading and a temporary file for writing
-        with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
-            mode="w", delete=False
-        ) as temp_file:
-            vector_count = 0
-            for line in mf:
-                if line.startswith("#"):
-                    temp_file.write(line)  # Write header lines as is
-                    continue
+    # Open the model file for reading and a temporary file for writing
+    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
+        mode="w", delete=False
+    ) as temp_file:
+        vector_count = 0
+        for line in mf:
+            if line.startswith("#"):
+                temp_file.write(line)
+                continue
 
-                vectors = eval(line.strip())
-                updated_line = []
-                for index, vector in enumerate(vectors):
-                    vector_count += 1
-                    for feature in feature_positions:
-                        if vector_count in feature_positions[feature]:
-                            feature_index = bp_vector_schema.index(feature)
-                            feature_status = feature_positions[feature][vector_count]
-                            vector[feature_index] = feature_status
-                    updated_line.append(str(vector))
-                temp_file.write(",".join(updated_line) + "\n")
+            vectors = [eval(vector) for vector in line.strip().split("\t")]
+            updated_line = []
+            for index, vector in enumerate(vectors):
+                vector_count += 1
+                for feature in feature_positions:
+                    if vector_count in feature_positions[feature]:
+                        feature_index = bp_vector_schema.index(feature)
+                        # Combine all feature statuses for this position
+                        feature_statuses = feature_positions[feature][vector_count]
+                        vector[feature_index] = feature_statuses
+                updated_line.append(str(vector))
+            temp_file.write("\t".join(updated_line) + "\n")
 
-        # Replace the old model file with the updated temporary file
-        os.replace(temp_file.name, model_file)
+    # Replace the old model file with the updated temporary file
+    os.replace(temp_file.name, model_file)
 
 
 def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> None:
@@ -187,7 +193,7 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
-            vectors = eval(line.strip())
+            vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
             for index, vector in enumerate(vectors):
                 vector_count += 1
@@ -195,7 +201,7 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
                     # Assign a list of ORF rules to the position
                     vector[position_to_write] = orf_positions[vector_count]
                 updated_line.append(str(vector))
-            temp_file.write(",".join(updated_line) + "\n")
+            temp_file.write("\t".join(updated_line) + "\n")
 
     # Replace the old model file with the updated temporary file
     os.replace(temp_file.name, model_file)
@@ -210,10 +216,10 @@ def write_poly_adenyl_file(
         for line in of:
             parts = line.strip().split("\t")
             start, end = int(parts[0]), int(parts[1])
-            poly_adenyl[start] = (WriteRule.START, end)
+            poly_adenyl.setdefault(start, []).append(WriteRule.START.value)
             for pos in range(start + 1, end):
-                poly_adenyl[pos] = (WriteRule.MIDDLE, None)
-            poly_adenyl[end] = (WriteRule.END, None)
+                poly_adenyl.setdefault(pos, []).append(WriteRule.MIDDLE.value)
+            poly_adenyl.setdefault(end, []).append(WriteRule.END.value)
 
     with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
         mode="w", delete=False
@@ -223,15 +229,18 @@ def write_poly_adenyl_file(
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
-            vectors = eval(line.strip())
+            vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
             for index, vector in enumerate(vectors):
                 vector_count += 1
                 if vector_count in poly_adenyl:
-                    poly_type, _ = poly_adenyl[vector_count]
-                    vector[position_to_write] = poly_type.value
+                    # Combine all poly-adenylation types for this position
+                    poly_types = poly_adenyl[vector_count]
+                    vector[position_to_write] = [rule for rule in poly_types]
+                else:
+                    vector[position_to_write] = 0
                 updated_line.append(str(vector))
-            temp_file.write(",".join(updated_line) + "\n")
+            temp_file.write("\t".join(updated_line) + "\n")
 
     # Replace the old model file with the updated temporary file
     os.replace(temp_file.name, model_file)
@@ -271,8 +280,18 @@ def transform_data_to_vectors(
         create_file_header(output_file, bp_vector_schema)
         write_fasta_file(f"{fasta_folder}/{filename}", output_file, bp_vector)
         write_promotor_motifs_file(
-            f"{promotor_motifs_folder}/{base_part}.txt", output_file, 4
+            f"{promotor_motifs_folder}/{base_part}.txt",
+            output_file,
+            bp_vector_schema.index("PROMOTOR_MOTIF"),
         )
-        write_gff3_file(f"{gff3_folder}/{base_part}.gff3", output_file)
-        write_orf_file(f"{orf_folder}/{base_part}.txt", output_file, 5)
-        write_poly_adenyl_file(f"{poly_adenyl_folder}/{base_part}.txt", output_file, 11)
+        write_gff3_file(
+            f"{gff3_folder}/{base_part}.gff3", output_file, bp_vector_schema
+        )
+        write_orf_file(
+            f"{orf_folder}/{base_part}.txt", output_file, bp_vector_schema.index("ORF")
+        )
+        write_poly_adenyl_file(
+            f"{poly_adenyl_folder}/{base_part}.txt",
+            output_file,
+            bp_vector_schema.index("POLY_ADENYL"),
+        )

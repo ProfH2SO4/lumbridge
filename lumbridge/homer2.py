@@ -86,6 +86,7 @@ def annotate_homer2_motifs(
     gff3_folder_path: str,
     homer2_folder_path: str,
     sequence_len_before_gene_start: int,
+    sequence_len_after_gene_start: int,
     p_threshold: float,
     output_folder: str,
 ) -> None:
@@ -119,7 +120,7 @@ def annotate_homer2_motifs(
         ret: list[tuple[int, int, str, str]] = get_position_in_fasta(
             fasta_file_path,
             [i[0] - sequence_len_before_gene_start - 1 for i in gene_boundary],
-            [i[0] - 1 for i in gene_boundary],
+            [i[0] + sequence_len_after_gene_start for i in gene_boundary],
             ret_homer_motifs,
         )
         write_to_output_folder(output_folder, name_part, ret)

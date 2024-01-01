@@ -1,1 +1,1 @@
-cmd = ./tests/lumbridge_output/homer2/arabidopsis_test_promoter.fasta fasta ./tests/lumbridge_output/homer2/arabidopsis_test_output_dir -len 6,8,10 -p 4 -fasta ./tests/lumbridge_output/homer2/arabidopsis_test_background.fasta
+cmd = /home/matej/git/lumbridge/tests//lumbridge_output/homer2/arabidopsis_test_promoter.fasta fasta /home/matej/git/lumbridge/tests//lumbridge_output/homer2/arabidopsis_test_output_dir -len 6,8,10 -p 4 -fasta /home/matej/git/lumbridge/tests//lumbridge_output/homer2/arabidopsis_test_background.fasta
