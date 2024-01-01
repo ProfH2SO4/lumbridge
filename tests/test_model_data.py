@@ -237,10 +237,12 @@ class TestModelData(unittest.TestCase):
             next(pf)  # Skip header
             for line in pf:
                 start, end, others = parse_line(line)
-                promoter_positions[start] = [WriteRule.START.value]
+                promoter_positions.setdefault(start, []).append(WriteRule.START.value)
                 for pos in range(start + 1, end):
-                    promoter_positions[pos] = [WriteRule.MIDDLE.value]
-                promoter_positions[end] = [WriteRule.END.value]
+                    promoter_positions.setdefault(pos, []).append(
+                        WriteRule.MIDDLE.value
+                    )
+                promoter_positions.setdefault(end, []).append(WriteRule.END.value)
 
         # Load the model data file
         model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
@@ -278,10 +280,14 @@ class TestModelData(unittest.TestCase):
             next(pf)  # Skip header
             for line in pf:
                 start, end, _ = parse_line(line)
-                for pos in range(start, end + 1):
+                poly_adenyl_positions.setdefault(start, []).append(
+                    WriteRule.START.value
+                )
+                for pos in range(start + 1, end):
                     poly_adenyl_positions.setdefault(pos, []).append(
-                        1
-                    )  # Append 1 for each polyadenylation signal
+                        WriteRule.MIDDLE.value
+                    )
+                poly_adenyl_positions.setdefault(end, []).append(WriteRule.END.value)
 
         # Load the model data file
         model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
