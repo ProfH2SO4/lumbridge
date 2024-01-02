@@ -26,8 +26,7 @@ def create_file_header(path_to_file: str, bp_vector_schema: list[str]) -> None:
         "#HEADER#\n"
         f"#DATE: {datetime.utcnow().date()}\n"
         f"#bp_vector_schema: {bp_vector_schema}\n"
-        "#0 = no present, 1 = present\n"
-        "#last element gene has own description: 0 = no present, 1 = gene_start, 2 = present, 3 = gene_end\n"
+        "#description of feature: 0 = no present, 1 = start, 2 = present, 3 = end\n"
         "####END####\n"
     )
     with open(path_to_file, "w") as f:
