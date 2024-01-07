@@ -36,7 +36,29 @@ Ensure that you have the necessary environment and dependencies installed on you
 Before beginning the setup, ensure your system meets the following requirements:
 - **Operating System:** Linux
 - **Python Version:** Python 3.10 or higher
-- **Additional Tools:** Homer2
+- **Additional Tools:** Homer2, Bedtools
+
+## Execution Methods
+
+The project can be executed using two primary methods:
+
+1. **Docker**: Utilizes a Docker container to encapsulate the environment and dependencies, ensuring a consistent and isolated execution across different systems.
+
+2. **Linux System**: Direct execution on a Linux-based system, where dependencies and environment configurations are managed locally.
+
+
+### Docker
+
+1. **Build image:**
+   ```bash
+   docker build -t lumbridge-app .
+   ```
+
+1. **Run container:**
+   ```bash
+   docker run -p 4000:80 lumbridge-app
+   ```
+
 
 ### Setting Up Python Virtual Environment
 A Python virtual environment is recommended for managing the project's dependencies.
@@ -62,10 +84,39 @@ Follow these steps to create and activate your virtual environment:
 Homer2 is a key tool required for this project.
 Follow the detailed installation guide to set up Homer2 on your system:
 
-- [Installation Guide](http://homer.ucsd.edu/homer/introduction/install.html)
+1. **Download Installation Script:**
+   ```bash
+   wget http://homer.ucsd.edu/homer/configureHomer.pl
+   ```
 
+2. **Run Installation Script:**
+   ```bash
+   perl configureHomer.pl -install
+   ```
 
-### Running the Application
+3. **Add to PATH in ~/.bash_profile:**
+   ```text
+   # Add the following line to your ~/.bash_profile
+   PATH=$PATH:/home/matej/homer2/bin
+   # Verify installation
+   which findMotifs.pl # Should output path in this case `/home/matej/homer2/bin/findMotifs.pl`
+   ```
+
+4. **Update Configuration File:**
+   ```text
+   # Update HOMER2_BIN_PATH in the configuration file
+   HOMER2_BIN_PATH="/home/matej/homer2/bin"
+   ```
+
+Refer to the [Homer2 Installation Guide](http://homer.ucsd.edu/homer/introduction/install.html) for more details.
+
+### Install Bedtools
+1. **Run Installation Script:**
+   ```bash
+   sudo apt-get install bedtools
+   ```
+
+## Running the Application
 
 #### Configuration Options:
 To customize the application's behavior, you have two options for configuration:
@@ -117,3 +168,31 @@ fasta_folder    gff3_folder    orf_folder
       |                             |
       v                             v
   model_data                     others
+```
+
+
+### Model Data Structure
+
+The data file is structured into two distinct sections: the header and the data content.
+
+#### Header
+The header section encapsulates critical metadata about the file, including the date of creation and the schema of the base pair (bp) vector. Each element in the bp vector represents a specific genomic feature, encoded as follows:
+
+```plaintext
+#HEADER#
+#DATE: 2024-01-07
+#bp_vector_schema: ['A', 'C', 'G', 'T', 'PROMOTOR_MOTIF', 'ORF', 'exon', 'mRNA', 'miRNA', 'rRNA', 'CDS', 'POLY_ADENYL', 'gene']
+#description of feature: 0 = not present, 1 = start, 2 = continuation/ongoing, 3 = end
+####END####
+```
+
+#### Data Content
+In the data section, each base pair (bp) from the FASTA file is represented by a vector.
+While the first four positions of the vector represent the nucleotides (A, C, G, T),
+subsequent positions may contain lists of integers, indicating the occurrence of multiple genomic features
+at the same position. For example:
+
+- [1, 0, 0, 0, 0, 0, [2], [2, 1], 0, 0, 0, 0, [1, 1]]
+
+In this representation, [2] signifies the ongoing presence of a feature, whereas [2, 1]
+indicates overlapping features at the same genomic location.

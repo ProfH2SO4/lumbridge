@@ -157,12 +157,14 @@ def create_background_file(
 
 
 def run_find_motifs(
-    promoters_fasta: str, output_directory: str, background_fasta: str, cpu_cores: int
+    homer2_bin_path: str,
+    promoters_fasta: str,
+    output_directory: str,
+    background_fasta: str,
+    cpu_cores: int,
 ):
-    # Set the PATH environment variable
-    homer_bin_path = "/home/matej/homer2/bin"
     current_env = os.environ.copy()
-    current_env["PATH"] = homer_bin_path + os.pathsep + current_env["PATH"]
+    current_env["PATH"] = homer2_bin_path + os.pathsep + current_env["PATH"]
 
     cmd = [
         "findMotifs.pl",
@@ -180,6 +182,7 @@ def run_find_motifs(
 
 
 def make_homer2_output(
+    homer2_bin_path: str,
     fasta_folder_path: str,
     gff3_folder_path: str,
     homer2_output_folder_path: str,
@@ -189,6 +192,7 @@ def make_homer2_output(
 ) -> None:
     """
 
+    :param homer2_bin_path:
     :param fasta_folder_path:
     :param gff3_folder_path:
     :param homer2_output_folder_path:
@@ -231,6 +235,7 @@ def make_homer2_output(
         )
 
         run_find_motifs(
+            homer2_bin_path,
             promoter_fasta_path,
             output_dir_path,
             background_fasta_path,

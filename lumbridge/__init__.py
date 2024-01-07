@@ -114,6 +114,7 @@ def run(test_config: str | None = None) -> None:
 
     log.info("------ Make homer2 output -------")
     make_homer2_output(
+        parsed_config["HOMER2_BIN_PATH"],
         parsed_config["INPUT_FASTA"],
         gff3_folder_pos_strand,
         parsed_config["HOMER2_OUTPUT_FOLDER"],

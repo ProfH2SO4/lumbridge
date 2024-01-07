@@ -26,7 +26,7 @@ def create_file_header(path_to_file: str, bp_vector_schema: list[str]) -> None:
         "#HEADER#\n"
         f"#DATE: {datetime.utcnow().date()}\n"
         f"#bp_vector_schema: {bp_vector_schema}\n"
-        "#description of feature: 0 = no present, 1 = start, 2 = present, 3 = end\n"
+        "#description of feature: 0 = no present, 1 = start, 2 = continuation/ongoing, 3 = end\n"
         "####END####\n"
     )
     with open(path_to_file, "w") as f:
@@ -112,7 +112,7 @@ def write_gff3_file(
     feature_positions = {
         feature: {}
         for feature in bp_vector_schema
-        if feature not in ["A", "C", "G", "T", "PROMOTOR_MOTIF", "POLY_ADENYL"]
+        if feature not in ["A", "C", "G", "T", "PROMOTOR_MOTIF", "ORF", "POLY_ADENYL"]
     }
 
     # Read GFF3 file and get positions for each feature

@@ -4,6 +4,7 @@ INPUT_ORF = "./test_data/orf_folder"
 OUTPUT_FOLDER = "./lumbridge_output"
 
 # Homer2
+HOMER2_BIN_PATH = "/usr/src/app/bin"
 HOMER2_OUTPUT_FOLDER = "./lumbridge_output/homer2"
 HOMER2_UPSTREAM_GEN_SEQ_LENGTH = 800
 HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH = 200
@@ -20,12 +21,10 @@ LOG_CONFIG = {
         }
     },
     "handlers": {
-        "sys_logger6": {
+        "console": {
             "level": "DEBUG",
-            "class": "logging.handlers.SysLogHandler",
+            "class": "logging.StreamHandler",
             "formatter": "default",
-            "address": "/dev/log",
-            "facility": "local6",
         },
         "file": {
             "level": "DEBUG",
@@ -37,7 +36,7 @@ LOG_CONFIG = {
     "loggers": {
         "default": {
             "level": "DEBUG",
-            "handlers": ["sys_logger6", "file"],
+            "handlers": ["console", "file"],  # Updated to use console handler
             "propagate": False,
         }
     },
