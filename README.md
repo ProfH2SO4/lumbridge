@@ -1,9 +1,25 @@
-# lumbridge
 
+# Lumbridge
+
+## Introduction
+Lumbridge is a project focused on Plant DNA Annotation and Preparation for Neural Networks.
+It aims to bridge the gap between annotations of different bioinformatics tools.
+
+## Table of Contents
+- [Project Goal](#project-goal)
+- [Requirements and Dependencies](#requirements-and-dependencies)
+- [Execution Methods](#execution-methods)
+- [Installation and Setup](#installation-and-setup)
+- [Usage Instructions](#usage-instructions)
+- [Project Workflow](#project-workflow)
+- [Structure of Model File](#structure-of-model-file)
+- [License Information](#license-information)
+- [Contact Information](#contact-information)
+- [Acknowledgments](#acknowledgments)
 
 ## Project Goal
 
-### Objective: Plant DNA Annotation and Preparation for Modeling
+#### Objective: Plant DNA Annotation and Preparation for Modeling
 
 The primary objective of this project is to meticulously annotate and prepare plant DNA sequences
 for subsequent computational modeling.  This involves a comprehensive analysis and labeling of
@@ -26,19 +42,14 @@ foundational groundwork for accurate and reliable biological simulations and ana
 
 
 
-## Project Setup and Requirements
+## Requirements and Dependencies
 
-This section of document outlines the setup and installation requirements for the project.
-Ensure that you have the necessary environment and dependencies installed on your system.
-
-
-### System Requirements
 Before beginning the setup, ensure your system meets the following requirements:
 - **Operating System:** Linux
 - **Python Version:** Python 3.10 or higher
 - **Additional Tools:** Homer2, Bedtools
 
-## Execution Methods
+### Execution Methods
 
 The project can be executed using two primary methods:
 
@@ -46,6 +57,7 @@ The project can be executed using two primary methods:
 
 2. **Linux System**: Direct execution on a Linux-based system, where dependencies and environment configurations are managed locally.
 
+## Installation and Setup
 
 ### Docker
 
@@ -116,7 +128,7 @@ Refer to the [Homer2 Installation Guide](http://homer.ucsd.edu/homer/introductio
    sudo apt-get install bedtools
    ```
 
-## Running the Application
+## Usage Instructions
 
 #### Configuration Options:
 To customize the application's behavior, you have two options for configuration:
@@ -132,8 +144,6 @@ This is a straightforward way to change settings if you don't require a separate
 #### Default Data:
 By default, the application uses test data from *Arabidopsis Thaliana*. This dataset serves as a standard reference
 for initial runs and testing purposes. You can replace it with your specific data in the configuration settings.
-
-
 
 
 ## Project Workflow
@@ -171,7 +181,7 @@ fasta_folder    gff3_folder    orf_folder
 ```
 
 
-### Model Data Structure
+### Structure of Model File
 
 The data file is structured into two distinct sections: the header and the data content.
 
@@ -196,3 +206,24 @@ at the same position. For example:
 
 In this representation, [2] signifies the ongoing presence of a feature, whereas [2, 1]
 indicates overlapping features at the same genomic location.
+
+
+
+## License Information
+MIT
+
+## Contact Information
+forgac.matej@gmail.com
+
+
+## Acknowledgments
+In this project were used additional programs: [Homer2 ](http://homer.ucsd.edu/homer/) and
+[Bedtools2](https://github.com/arq5x/bedtools2). Thanks all people for contributions to these projects.
+
+### Citation
+Please cite the following article if you use BEDTools in your research:
+
+Quinlan AR and Hall IM, 2010. BEDTools: a flexible suite of utilities for comparing genomic features. Bioinformatics. 26, 6, pp. 841–842.
+#### Also, if you use pybedtools, please cite the following.
+
+Dale RK, Pedersen BS, and Quinlan AR. Pybedtools: a flexible Python library for manipulating genomic datasets and annotations. Bioinformatics (2011). doi:10.1093/bioinformatics/btr539
