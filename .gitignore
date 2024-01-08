@@ -134,3 +134,5 @@ dmypy.json
 /logs/
 
 /lumbridge_output/
+
+/tests/lumbridge_output/

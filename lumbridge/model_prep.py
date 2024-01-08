@@ -81,15 +81,15 @@ def write_promotor_motifs_file(
                 promoter_positions.setdefault(pos, []).append(WriteRule.MIDDLE)
             promoter_positions.setdefault(end, []).append(WriteRule.END)
 
-    # Step 2: Update the model file based on promoter positions
-    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
-        mode="w", delete=False
-    ) as temp_file:
-        vector_count = 0  # Counter for the position of each vector
+    # Step 2: Read and update the model file line by line
+    temp_file_path = model_file + ".tmp"
+    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
+        vector_count = 0
         for line in mf:
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
+
             vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
             for index, vector in enumerate(vectors):
@@ -99,10 +99,11 @@ def write_promotor_motifs_file(
                     promoter_types = promoter_positions[vector_count]
                     vector[position_to_write] = [rule.value for rule in promoter_types]
                 updated_line.append(str(vector))
+
             temp_file.write("\t".join(updated_line) + "\n")
 
     # Step 3: Replace the old model file with the updated temporary file
-    os.replace(temp_file.name, model_file)
+    os.rename(temp_file_path, model_file)
 
 
 def write_gff3_file(
@@ -137,9 +138,8 @@ def write_gff3_file(
                 )
 
     # Open the model file for reading and a temporary file for writing
-    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
-        mode="w", delete=False
-    ) as temp_file:
+    temp_file_path = model_file + ".tmp"
+    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
         vector_count = 0
         for line in mf:
             if line.startswith("#"):
@@ -160,7 +160,7 @@ def write_gff3_file(
             temp_file.write("\t".join(updated_line) + "\n")
 
     # Replace the old model file with the updated temporary file
-    os.replace(temp_file.name, model_file)
+    os.rename(temp_file_path, model_file)
 
 
 def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> None:
@@ -184,9 +184,8 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
                     orf_positions.setdefault(pos, []).append(orf_rule.value)
 
     # Step 2: Update the model file based on ORF positions
-    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
-        mode="w", delete=False
-    ) as temp_file:
+    temp_file_path = model_file + ".tmp"
+    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
         vector_count = 0  # Counter for the position of each vector
         for line in mf:
             if line.startswith("#"):
@@ -203,12 +202,13 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
             temp_file.write("\t".join(updated_line) + "\n")
 
     # Replace the old model file with the updated temporary file
-    os.replace(temp_file.name, model_file)
+    os.rename(temp_file_path, model_file)
 
 
 def write_poly_adenyl_file(
     poly_adenyl_file: str, model_file: str, position_to_write: int
 ) -> None:
+    # Step 1: Read polyadenylation file and get start and end positions
     poly_adenyl = {}
     with open(poly_adenyl_file, "r") as of:
         next(of)  # Skip header
@@ -220,9 +220,9 @@ def write_poly_adenyl_file(
                 poly_adenyl.setdefault(pos, []).append(WriteRule.MIDDLE.value)
             poly_adenyl.setdefault(end, []).append(WriteRule.END.value)
 
-    with open(model_file, "r") as mf, tempfile.NamedTemporaryFile(
-        mode="w", delete=False
-    ) as temp_file:
+    # Step 2: Update the model file based on polyadenylation positions
+    temp_file_path = model_file + ".tmp"
+    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
         vector_count = 0  # Counter for the position of each vector
         for line in mf:
             if line.startswith("#"):
@@ -242,7 +242,7 @@ def write_poly_adenyl_file(
             temp_file.write("\t".join(updated_line) + "\n")
 
     # Replace the old model file with the updated temporary file
-    os.replace(temp_file.name, model_file)
+    os.rename(temp_file_path, model_file)
 
 
 def transform_data_to_vectors(
