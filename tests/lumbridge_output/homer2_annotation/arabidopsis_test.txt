@@ -1,2 +1,0 @@
-start	end	p_value	seq
-13496	13505	1e-5	CGTTGACTTT

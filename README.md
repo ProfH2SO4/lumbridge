@@ -93,7 +93,7 @@ Follow these steps to create and activate your virtual environment:
 
 3. **Install Required Python Packages:**
    ```bash
-   pip install -Ur requirements.txt
+   pip3 install -Ur requirements.txt
    ```
 
 
