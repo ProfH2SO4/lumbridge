@@ -12,6 +12,10 @@ HOMER2_P_THRESHOLD = 0.05
 HOMER2_CPU_CORES = 4
 
 
+# model_data
+MAX_FEATURE_OVERLAP = 1  # for given feature
+
+
 LOG_CONFIG = {
     "version": 1,
     "formatters": {

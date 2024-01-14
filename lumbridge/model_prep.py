@@ -8,9 +8,17 @@ __all__ = ["transform_data_to_vectors"]
 
 
 class WriteRule(Enum):
-    START = 1
-    MIDDLE = 2
-    END = 3
+    START = [1, 0, 0]
+    MIDDLE = [0, 1, 0]
+    END = [0, 0, 1]
+
+
+def calculate_position(index_feature: int, max_feature_overlap: int) -> tuple[int, int]:
+    feature_len = 3  # Length of a single feature representation
+
+    start_position = 4 + (index_feature - 4) * feature_len * max_feature_overlap
+    end_position = start_position + feature_len - 1
+    return (start_position, end_position)
 
 
 def parse_line(line):
@@ -21,26 +29,41 @@ def parse_line(line):
     return start, end, parts[2:]
 
 
-def create_file_header(path_to_file: str, bp_vector_schema: list[str]) -> None:
+def create_file_header(
+    path_to_file: str,
+    bp_vector_schema: list[str],
+    max_feature_overlap: int,
+    version: list[int],
+) -> None:
     header_: str = (
         "#HEADER#\n"
-        f"#DATE: {datetime.utcnow().date()}\n"
-        f"#bp_vector_schema: {bp_vector_schema}\n"
-        "#description of feature: 0 = no present, 1 = start, 2 = continuation/ongoing, 3 = end\n"
+        f"#DATE={datetime.utcnow().isoformat()}\n"
+        f"#pre_processing_version={version}\n"
+        f"#bp_vector_schema={bp_vector_schema}\n"
+        "#description of feature:[0, 0, 0]=no_present, [1, 0, 0]=start, [0, 1, 0]=continuation/ongoing, [0, 0, 1]=end\n"
+        f"#max_feature_overlap={max_feature_overlap}\n"
         "####END####\n"
     )
     with open(path_to_file, "w") as f:
         f.write(header_)
 
 
-def write_fasta_file(fasta_file: str, model_file: str, vector_base: list[int]):
-    vec_len: int = len(vector_base)
+def write_fasta_file(
+    fasta_file: str,
+    model_file: str,
+    bp_vector_schema: list[str],
+    max_feature_overlap: int,
+):
+    num_of_features: int = len(bp_vector_schema) - 4
+    feature_len: int = 3  # Length of a single feature representation
+    total_feature_len: int = feature_len * num_of_features * max_feature_overlap
+
     # Mapping nucleotides to vectors
     nucleotide_to_vector = {
-        "A": [1] + [0] * (vec_len - 1),
-        "C": [0] + [1] + [0] * (vec_len - 2),
-        "G": [0] * 2 + [1] + [0] * (vec_len - 3),
-        "T": [0] * 3 + [1] + [0] * (vec_len - 4),
+        "A": [1, 0, 0, 0] + [0] * total_feature_len,
+        "C": [0, 1, 0, 0] + [0] * total_feature_len,
+        "G": [0, 0, 1, 0] + [0] * total_feature_len,
+        "T": [0, 0, 0, 1] + [0] * total_feature_len,
     }
 
     # Read the FASTA file and write to the model file
@@ -58,7 +81,7 @@ def write_fasta_file(fasta_file: str, model_file: str, vector_base: list[int]):
                     vector_count += 1
 
                     # Write the vector to the model file
-                    if vector_count == 5:
+                    if vector_count == 2:
                         # At the fifth vector, write it followed by a newline and reset the counter
                         model.write(f"{vector}\n")
                         vector_count = 0
@@ -68,46 +91,65 @@ def write_fasta_file(fasta_file: str, model_file: str, vector_base: list[int]):
 
 
 def write_promotor_motifs_file(
-    promotor_file: str, model_file: str, position_to_write: int
+    promotor_file: str,
+    model_file: str,
+    position_in_schema: int,
+    max_feature_overlap: int,
 ) -> None:
-    # Step 1: Read promoter file and get start and end positions
+
+    position_to_write: tuple[int, int] = calculate_position(
+        position_in_schema, max_feature_overlap
+    )
+
+    # Read promoter file
     promoter_positions = {}
     with open(promotor_file, "r") as pf:
         next(pf)  # Skip header
         for line in pf:
-            start, end, other_parts = parse_line(line)
+            start, end, other_parts = parse_line(
+                line
+            )  # Assuming parse_line is defined elsewhere
             promoter_positions.setdefault(start, []).append(WriteRule.START)
             for pos in range(start + 1, end):
                 promoter_positions.setdefault(pos, []).append(WriteRule.MIDDLE)
             promoter_positions.setdefault(end, []).append(WriteRule.END)
 
-    # Step 2: Read and update the model file line by line
+    # Update the model file
     temp_file_path = model_file + ".tmp"
+    index = -1
     with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        vector_count = 0
         for line in mf:
             if line.startswith("#"):
-                temp_file.write(line)  # Write header lines as is
+                temp_file.write(line)
                 continue
 
             vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
-            for index, vector in enumerate(vectors):
-                vector_count += 1
-                if vector_count in promoter_positions:
-                    # Combine all promoter types for this position
-                    promoter_types = promoter_positions[vector_count]
-                    vector[position_to_write] = [rule.value for rule in promoter_types]
-                updated_line.append(str(vector))
+            for _, vector in enumerate(vectors):
+                index += 1
+                if index in promoter_positions:
+                    promoter_types = promoter_positions[index]
+                    for offset in range(0, max_feature_overlap * 3, 3):
+                        pos = position_to_write[0] + offset
+                        if pos + 2 < len(vector) and vector[pos : pos + 3] == [0, 0, 0]:
+                            rule_to_write = promoter_types[
+                                0
+                            ]  # Write only the first matching rule
+                            vector[pos : pos + 3] = rule_to_write.value
+                            break  # Break after finding a space to write
 
+                updated_line.append(str(vector))
             temp_file.write("\t".join(updated_line) + "\n")
 
-    # Step 3: Replace the old model file with the updated temporary file
+    # Replace the old model file with the updated one
     os.rename(temp_file_path, model_file)
 
 
 def write_gff3_file(
-    gff3_file: str, model_file: str, bp_vector_schema: list[str]
+    gff3_file: str,
+    model_file: str,
+    bp_vector_schema: list[str],
+    max_feature_overlap: int,
 ) -> None:
     # Initialize dictionaries to store positions for each feature
     feature_positions = {
@@ -129,18 +171,16 @@ def write_gff3_file(
                 for pos in range(start, end + 1):
                     feature_positions[feature_type].setdefault(pos, []).append(
                         WriteRule.MIDDLE.value
+                        if pos != start and pos != end
+                        else WriteRule.START.value
+                        if pos == start
+                        else WriteRule.END.value
                     )
-                feature_positions[feature_type].setdefault(start, []).append(
-                    WriteRule.START.value
-                )
-                feature_positions[feature_type].setdefault(end, []).append(
-                    WriteRule.END.value
-                )
 
     # Open the model file for reading and a temporary file for writing
     temp_file_path = model_file + ".tmp"
+    index = -1
     with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        vector_count = 0
         for line in mf:
             if line.startswith("#"):
                 temp_file.write(line)
@@ -148,22 +188,41 @@ def write_gff3_file(
 
             vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
-            for index, vector in enumerate(vectors):
-                vector_count += 1
-                for feature in feature_positions:
-                    if vector_count in feature_positions[feature]:
+            for _, vector in enumerate(vectors):
+                index += 1
+                for feature, positions in feature_positions.items():
+                    if index in positions:
                         feature_index = bp_vector_schema.index(feature)
-                        # Combine all feature statuses for this position
-                        feature_statuses = feature_positions[feature][vector_count]
-                        vector[feature_index] = feature_statuses
+                        for offset in range(0, max_feature_overlap * 3, 3):
+                            pos = (
+                                calculate_position(feature_index, max_feature_overlap)[
+                                    0
+                                ]
+                                + offset
+                            )
+                            if pos + 2 < len(vector) and vector[pos : pos + 3] == [
+                                0,
+                                0,
+                                0,
+                            ]:
+                                vector[pos : pos + 3] = positions[index][
+                                    0
+                                ]  # Write only the first matching rule
+                                break  # Break after finding a space to write
+
                 updated_line.append(str(vector))
             temp_file.write("\t".join(updated_line) + "\n")
-
-    # Replace the old model file with the updated temporary file
     os.rename(temp_file_path, model_file)
 
 
-def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> None:
+def write_orf_file(
+    orf_file: str, model_file: str, position_in_schema: int, max_feature_overlap: int
+) -> None:
+    # Calculate positions to write ORF information
+    position_to_write: tuple[int, int] = calculate_position(
+        position_in_schema, max_feature_overlap
+    )
+
     # Step 1: Read ORF file and get start and end positions for ORFs within genes
     orf_positions = {}
     with open(orf_file, "r") as of:
@@ -185,19 +244,28 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
 
     # Step 2: Update the model file based on ORF positions
     temp_file_path = model_file + ".tmp"
+    index = -1
     with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        vector_count = 0  # Counter for the position of each vector
         for line in mf:
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
+
             vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
-            for index, vector in enumerate(vectors):
-                vector_count += 1
-                if vector_count in orf_positions:
-                    # Assign a list of ORF rules to the position
-                    vector[position_to_write] = orf_positions[vector_count]
+            for _, vector in enumerate(vectors):
+                index += 1
+                if index in orf_positions:
+                    orf_types = orf_positions[index]
+                    for offset in range(0, max_feature_overlap * 3, 3):
+                        pos = position_to_write[0] + offset
+                        if pos + 2 < len(vector) and vector[pos : pos + 3] == [0, 0, 0]:
+                            rule_to_write = orf_types[
+                                0
+                            ]  # Write only the first matching rule
+                            vector[pos : pos + 3] = rule_to_write
+                            break  # Break after finding a space to write
+
                 updated_line.append(str(vector))
             temp_file.write("\t".join(updated_line) + "\n")
 
@@ -206,42 +274,52 @@ def write_orf_file(orf_file: str, model_file: str, position_to_write: int) -> No
 
 
 def write_poly_adenyl_file(
-    poly_adenyl_file: str, model_file: str, position_to_write: int
+    poly_adenyl_file: str,
+    model_file: str,
+    position_in_schema: int,
+    max_feature_overlap: int,
 ) -> None:
+    # Calculate positions to write polyadenylation information
+    position_to_write: tuple[int, int] = calculate_position(
+        position_in_schema, max_feature_overlap
+    )
+
     # Step 1: Read polyadenylation file and get start and end positions
-    poly_adenyl = {}
+    poly_adenyl_positions = {}
     with open(poly_adenyl_file, "r") as of:
         next(of)  # Skip header
         for line in of:
             parts = line.strip().split("\t")
             start, end = int(parts[0]), int(parts[1])
-            poly_adenyl.setdefault(start, []).append(WriteRule.START.value)
+            poly_adenyl_positions.setdefault(start, []).append(WriteRule.START.value)
             for pos in range(start + 1, end):
-                poly_adenyl.setdefault(pos, []).append(WriteRule.MIDDLE.value)
-            poly_adenyl.setdefault(end, []).append(WriteRule.END.value)
+                poly_adenyl_positions.setdefault(pos, []).append(WriteRule.MIDDLE.value)
+            poly_adenyl_positions.setdefault(end, []).append(WriteRule.END.value)
 
     # Step 2: Update the model file based on polyadenylation positions
     temp_file_path = model_file + ".tmp"
+    index = -1
     with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        vector_count = 0  # Counter for the position of each vector
         for line in mf:
             if line.startswith("#"):
                 temp_file.write(line)  # Write header lines as is
                 continue
+
             vectors = [eval(vector) for vector in line.strip().split("\t")]
             updated_line = []
-            for index, vector in enumerate(vectors):
-                vector_count += 1
-                if vector_count in poly_adenyl:
-                    # Combine all poly-adenylation types for this position
-                    poly_types = poly_adenyl[vector_count]
-                    vector[position_to_write] = [rule for rule in poly_types]
-                else:
-                    vector[position_to_write] = 0
+            for _, vector in enumerate(vectors):
+                index += 1
+                if index in poly_adenyl_positions:
+                    poly_types = poly_adenyl_positions[index]
+                    for offset in range(0, max_feature_overlap * 3, 3):
+                        pos = position_to_write[0] + offset
+                        if pos + 2 < len(vector) and vector[pos : pos + 3] == [0, 0, 0]:
+                            vector[pos : pos + 3] = poly_types[
+                                0
+                            ]  # Write only the first matching rule
+                            break  # Break after finding a space to write
                 updated_line.append(str(vector))
             temp_file.write("\t".join(updated_line) + "\n")
-
-    # Replace the old model file with the updated temporary file
     os.rename(temp_file_path, model_file)
 
 
@@ -252,6 +330,8 @@ def transform_data_to_vectors(
     promotor_motifs_folder: str,
     poly_adenyl_folder: str,
     output_folder: str,
+    max_feature_overlap: int,
+    version: list[int],
 ) -> None:
     bp_vector_schema: list[str] = [
         "A",
@@ -268,7 +348,6 @@ def transform_data_to_vectors(
         "POLY_ADENYL",
         "gene",
     ]
-    bp_vector: list[int] = [0 for i in bp_vector_schema]
     create_folder(output_folder)
     for filename in os.listdir(fasta_folder):
         ending = ".fasta"
@@ -276,21 +355,34 @@ def transform_data_to_vectors(
             continue
         base_part, extension = os.path.splitext(filename)
         output_file: str = f"{output_folder}/{base_part}.txt"
-        create_file_header(output_file, bp_vector_schema)
-        write_fasta_file(f"{fasta_folder}/{filename}", output_file, bp_vector)
+        create_file_header(output_file, bp_vector_schema, max_feature_overlap, version)
+        write_fasta_file(
+            f"{fasta_folder}/{filename}",
+            output_file,
+            bp_vector_schema,
+            max_feature_overlap,
+        )
         write_promotor_motifs_file(
             f"{promotor_motifs_folder}/{base_part}.txt",
             output_file,
             bp_vector_schema.index("PROMOTOR_MOTIF"),
+            max_feature_overlap,
         )
         write_gff3_file(
-            f"{gff3_folder}/{base_part}.gff3", output_file, bp_vector_schema
+            f"{gff3_folder}/{base_part}.gff3",
+            output_file,
+            bp_vector_schema,
+            max_feature_overlap,
         )
         write_orf_file(
-            f"{orf_folder}/{base_part}.txt", output_file, bp_vector_schema.index("ORF")
+            f"{orf_folder}/{base_part}.txt",
+            output_file,
+            bp_vector_schema.index("ORF"),
+            max_feature_overlap,
         )
         write_poly_adenyl_file(
             f"{poly_adenyl_folder}/{base_part}.txt",
             output_file,
             bp_vector_schema.index("POLY_ADENYL"),
+            max_feature_overlap,
         )

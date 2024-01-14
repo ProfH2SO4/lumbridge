@@ -15,7 +15,7 @@ from .model_prep import transform_data_to_vectors
 import config
 import log
 
-__version__ = "0.0.1"
+__version__ = [0, 1, 0]
 __last_update__ = "2023-10-25T20:00:00"
 
 
@@ -72,6 +72,7 @@ def create_file_if_not_exists(path_to_file: str) -> None:
 
 
 def run(test_config: str | None = None) -> None:
+    print("------ Start  -------")
     # Load Config
     config_: ModuleType = load_config(test_config)
     parsed_config: dict[str, any] = parse_namespace(config_)
@@ -142,6 +143,8 @@ def run(test_config: str | None = None) -> None:
         promotor_motifs_folder=f"{parsed_config['OUTPUT_FOLDER']}/homer2_annotation",
         poly_adenyl_folder=f"{parsed_config['OUTPUT_FOLDER']}/poly_adenylation",
         output_folder=f"{parsed_config['OUTPUT_FOLDER']}/model_data",
+        max_feature_overlap=parsed_config["MAX_FEATURE_OVERLAP"],
+        version=__version__,
     )
 
     log.info("------ Done  -------")

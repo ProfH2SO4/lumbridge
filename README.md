@@ -32,9 +32,9 @@ various genetic elements within the DNA sequences of plants,  followed by a syst
 these annotated sequences to be utilized effectively in predictive modeling and simulation studies.
 
 Key aspects of this process include:
-- Utilizing gff3 and .cds files as primary inputs for foundational genomic information.
+- Utilizing [ gff3 ](https://www.ensembl.org/info/website/upload/gff3.html) and [ cds ](https://www.ncbi.nlm.nih.gov/orffinder/) files as primary inputs for foundational genomic information.
 - Employing advanced bioinformatics tools to identify and annotate additional key genomic features that are
-not explicitly detailed in the gff3 and .cds files.
+not explicitly detailed in the gff3 and cds files.
 - This includes the identification of promoter motifs, polyadenylation sequences, and other regulatory regions
 that play a crucial role in gene expression and regulation.
 - Integrating comprehensive data from various sources and formats to build a complete and accurate
