@@ -198,8 +198,9 @@ The header section encapsulates critical metadata about the file, including the 
 #HEADER#
 #DATE=2024-01-14T16:35:29.982692
 #pre_processing_version=[0, 1, 0]
-#bp_vector_schema=['A', 'C', 'G', 'T', 'PROMOTOR_MOTIF', 'ORF', 'exon', 'mRNA', 'miRNA', 'rRNA', 'CDS', 'POLY_ADENYL', 'gene']
-#description of feature:[0, 0, 0]=no_present, [1, 0, 0]=start, [0, 1, 0]=continuation/ongoing, [0, 0, 1]=end
+#bp_vector_schema=['A', 'C', 'G', 'T', 'PROMOTOR_MOTIF', 'ORF', 'POLY_ADENYL', 'miRNA', 'rRNA', 'gene']
+#description of nucleotide:A=[1, 0, 0, 0], C=[0, 1, 0, 0], G=[0, 0, 1, 0], T=[0, 0, 0, 1]
+#description of feature:0=no_present, 1=start, 2=continuation/ongoing, 3=end
 #max_feature_overlap=1
 ####END####
 ```
@@ -213,13 +214,13 @@ With a higher number of `max_feature_overlap`, the size of the vector also incre
 
 For example, with `max_feature_overlap=1`:
 
-- [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
-  This vector indicates that there is Adenine, start of exon, start of mRNA and  the start of a gene.
+- [1, 0, 0, 0, 0, 0, 0, 0, 0, 3]
+  This vector indicates that there is Adenine and the end of a gene.
 
 For example, with `max_feature_overlap=2`:
 
-- [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0]
-  This vector indicates that it is Cytosine and at the end (the last 6 elements: `1, 0, 0, 0, 1, 0`), one gene is starting and another is ongoing.
+- [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3]
+  This vector indicates that it is Cytosine and at the end (the last 2 elements: `2, 3`), one gene is ongoing and the other ends.
 
 
 
