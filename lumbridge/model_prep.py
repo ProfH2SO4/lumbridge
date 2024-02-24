@@ -89,51 +89,93 @@ def write_fasta_file(
                         model.write(f"{vector}\t")
 
 
-def write_promotor_motifs_file(
-    promotor_file: str,
-    model_file: str,
-    position_in_schema: int,
-    max_feature_overlap: int,
-) -> None:
+def parse_promoter_file(promoter_file: str) -> dict:
+    """
+    Parses the promoter file to identify the positions of promoters.
 
-    position_to_write: tuple[int, int] = calculate_position(position_in_schema, max_feature_overlap)
-
-    # Read promoter file
+    :param promoter_file: The path to the promoter file.
+    :return: A dictionary mapping promoter positions to their respective WriteRule.
+    """
     promoter_positions = {}
-    with open(promotor_file, "r") as pf:
-        next(pf)  # Skip header
-        for line in pf:
-            start, end, other_parts = parse_line(line)
-            promoter_positions.setdefault(start, WriteRule.START)
+    with open(promoter_file, "r") as file:
+        next(file)  # Skip header
+        for line in file:
+            start, end, _ = parse_line(line)
+            promoter_positions.setdefault(start, []).append(WriteRule.START)
             for pos in range(start + 1, end):
-                promoter_positions.setdefault(pos, WriteRule.MIDDLE)
-            promoter_positions.setdefault(end, WriteRule.END)
+                promoter_positions.setdefault(pos, []).append(WriteRule.MIDDLE)
+            promoter_positions.setdefault(end, []).append(WriteRule.END)
+    return promoter_positions
 
-    # Update the model file
+
+def update_model_with_promoters(
+    model_file: str, promoter_positions: dict, position_to_write: tuple[int, int], max_overlap: int
+):
+    """
+    Updates the model file with promoter positions.
+
+    :param model_file: The path to the model file.
+    :param promoter_positions: A dictionary of promoter positions and their types.
+    :param position_to_write: The start and end positions to write the promoters.
+    :param max_overlap: The maximum allowed overlap for features.
+    :return:
+    """
     temp_file_path = model_file + ".tmp"
-    index = -1
-    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        for line in mf:
+    with open(model_file, "r") as model, open(temp_file_path, "w") as temp_file:
+        for line in model:
             if line.startswith("#"):
                 temp_file.write(line)
                 continue
 
-            vectors = [eval(vector) for vector in line.strip().split("\t")]
-            updated_line = []
-            for _, vector in enumerate(vectors):
-                index += 1
-                if index in promoter_positions:
-                    promoter_types = promoter_positions[index]
-                    for offset in range(0, max_feature_overlap):
-                        pos = position_to_write[0] + offset
-                        if vector[pos] == 0:  # Write only the first matching rule
-                            vector[pos] = promoter_types.value
-                            break  # Break after finding a space to write
-                updated_line.append(str(vector))
-            temp_file.write("\t".join(updated_line) + "\n")
+            updated_line: str = update_line(line, promoter_positions, position_to_write, max_overlap)
+            temp_file.write(updated_line)
 
     # Replace the old model file with the updated one
-    os.rename(temp_file_path, model_file)
+    os.replace(temp_file_path, model_file)
+
+
+def update_line(line: str, promoter_positions: dict, position_to_write: tuple[int, int], max_overlap: int) -> str:
+    """
+    Updates a line of the model file based on promoter positions.
+
+    :param line: A line from the model file.
+    :param promoter_positions: A dictionary of promoter positions and their types.
+    :param position_to_write: The start and end positions to write the promoters.
+    :param max_overlap: The maximum allowed overlap for features.
+    :return: The updated line for the model file.
+    """
+    vectors = [eval(vector) for vector in line.strip().split("\t")]
+    updated_vectors = []
+    index = -1
+    for vector in vectors:
+        index += 1
+        if index in promoter_positions:
+            promoter_type = promoter_positions[index]
+            for offset in range(max_overlap):
+                pos = position_to_write[0] + offset
+                if vector[pos] == 0:  # Write only the first matching rule
+                    vector[pos] = promoter_type[offset].value
+                    break  # Break after finding a space to write
+        updated_vectors.append(str(vector))
+
+    return "\t".join(updated_vectors) + "\n"
+
+
+def write_promotor_motifs_file(
+    promoter_file: str, model_file: str, position_in_schema: int, max_feature_overlap: int
+) -> None:
+    """
+    Updates the model file with promoter motifs based on the promoter file.
+
+    :param promoter_file: The path to the promoter file.
+    :param model_file: The path to the model file.
+    :param position_in_schema: The position in the schema for writing promoters.
+    :param max_feature_overlap: The maximum allowed overlap for features.
+    :return:
+    """
+    position_to_write = calculate_position(position_in_schema, max_feature_overlap)
+    promoter_positions = parse_promoter_file(promoter_file)
+    update_model_with_promoters(model_file, promoter_positions, position_to_write, max_feature_overlap)
 
 
 def write_gff3_file(
@@ -193,13 +235,9 @@ def write_gff3_file(
     os.rename(temp_file_path, model_file)
 
 
-def write_orf_file(orf_file: str, model_file: str, position_in_schema: int, max_feature_overlap: int) -> None:
-    # Calculate positions to write ORF information
-    position_to_write: tuple[int, int] = calculate_position(position_in_schema, max_feature_overlap)
-
-    # Step 1: Read ORF file and get start and end positions for ORFs within genes
+def parse_orf_file(path_orf_file: str) -> dict:
     orf_positions = {}
-    with open(orf_file, "r") as of:
+    with open(path_orf_file, "r") as of:
         next(of)  # Skip header
         for line in of:
             parts = line.strip().split("\t")
@@ -208,33 +246,23 @@ def write_orf_file(orf_file: str, model_file: str, position_in_schema: int, max_
                 # Add ORF rules as a list for each position
                 for pos in range(start, end + 1):
                     orf_rule = WriteRule.START if pos == start else WriteRule.END if pos == end else WriteRule.MIDDLE
-                    orf_positions.setdefault(pos, orf_rule)
+                    orf_positions.setdefault(pos, []).append(orf_rule)
+    return orf_positions
 
-    # Update the model file
-    temp_file_path = model_file + ".tmp"
-    index = -1
-    with open(model_file, "r") as mf, open(temp_file_path, "w") as temp_file:
-        for line in mf:
-            if line.startswith("#"):
-                temp_file.write(line)
-                continue
 
-            vectors = [eval(vector) for vector in line.strip().split("\t")]
-            updated_line = []
-            for _, vector in enumerate(vectors):
-                index += 1
-                if index in orf_positions:
-                    promoter_types = orf_positions[index]
-                    for offset in range(0, max_feature_overlap):
-                        pos = position_to_write[0] + offset
-                        if vector[pos] == 0:  # Write only the first matching rule
-                            vector[pos] = promoter_types.value
-                            break  # Break after finding a space to write
-                updated_line.append(str(vector))
-            temp_file.write("\t".join(updated_line) + "\n")
+def write_orf_file(orf_file: str, model_file: str, position_in_schema: int, max_feature_overlap: int) -> None:
+    """
+    Updates the model file with promoter motifs based on the promoter file.
 
-    # Replace the old model file with the updated temporary file
-    os.rename(temp_file_path, model_file)
+    :param orf_file: The path to the orf file.
+    :param model_file: The path to the model file.
+    :param position_in_schema: The position in the schema for writing promoters.
+    :param max_feature_overlap: The maximum allowed overlap for features.
+    :return:
+    """
+    position_to_write = calculate_position(position_in_schema, max_feature_overlap)
+    promoter_positions = parse_orf_file(orf_file)
+    update_model_with_promoters(model_file, promoter_positions, position_to_write, max_feature_overlap)
 
 
 def write_poly_adenyl_file(

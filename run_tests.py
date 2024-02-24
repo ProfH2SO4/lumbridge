@@ -1,19 +1,23 @@
 import unittest
 
 
-from tests import test_model_data
-from lumbridge import run
+from tests.test_model_data import test_model_data_factory
+
 
 if __name__ == "__main__":
-    run("./tests/test_config.py")
-    # Create a test loader
     suite = unittest.TestSuite()
 
-    # Discover and load all tests in the 'tests' directory
-    suite.addTests(unittest.TestLoader().loadTestsFromModule(test_model_data))
+    input_dir_path_fasta = "/home/matej/git/lumbridge/test_data/fasta_folder"
+    input_dir_path_gff3 = "/home/matej/git/lumbridge/test_data/gff3_folder"
+    input_dir_path_orf = "/home/matej/git/lumbridge/test_data/orf_folder"
+    output_dir_path = "/home/matej/git/lumbridge/lumbridge_output"
 
-    # Create a test runner that will display the results to the console
+    # Create an instance of the test case class with specific parameters
+    test_class = test_model_data_factory(input_dir_path_fasta, input_dir_path_gff3, input_dir_path_orf, output_dir_path)
+
+    # Add tests from the customized test case class
+    tests = unittest.TestLoader().loadTestsFromTestCase(test_class)
+    suite.addTests(tests)
+
     runner = unittest.TextTestRunner(verbosity=2)
-
-    # Run the tests
     runner.run(suite)

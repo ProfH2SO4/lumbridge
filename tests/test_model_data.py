@@ -1,30 +1,12 @@
+import ast
 import unittest, os
 from enum import Enum
-
-from .test_config import INPUT_FASTA, OUTPUT_FOLDER
 
 
 class WriteRule(Enum):
     START = 1
     MIDDLE = 2
     END = 3
-
-
-bp_vector_schema: list[str] = [
-    "A",
-    "C",
-    "G",
-    "T",
-    "PROMOTOR_MOTIF",
-    "ORF",
-    "exon",
-    "mRNA",
-    "miRNA",
-    "rRNA",
-    "CDS",
-    "POLY_ADENYL",
-    "gene",
-]
 
 
 def parse_line(line):
@@ -55,70 +37,36 @@ def process_model_data_line(line):
     return [eval(vector) for vector in line.strip().split("\t")]
 
 
-class TestModelData(unittest.TestCase):
-    def test_brackets(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-        model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
+def extract_bp_vector_schema(file_path: str) -> list[str]:
+    """
+    Extracts the bp_vector_schema from a given file.
+    """
+    with open(file_path, "r") as file:
+        for line in file:
+            if line.startswith("#bp_vector_schema="):
+                # Extracting the list part of the line and evaluating it
+                schema_str = line.split("=", 1)[1].strip()
+                # Using eval to convert the string representation of the list to an actual list
+                bp_vector_schema = eval(schema_str)
+                return bp_vector_schema
 
-        with open(model_data_file, "r") as file:
-            line_number = 0
-            for line in file:
-                line_number += 1
-                if line.startswith("#"):
-                    continue  # Skip header lines
 
-                # Count opening and closing brackets
-                open_brackets = line.count("[")
-                close_brackets = line.count("]")
+def load_feature_data(path_promotor_file: str) -> dict:
+    promoter_positions = {}
+    with open(path_promotor_file, "r") as pf:
+        next(pf)  # Skip header
+        for line in pf:
+            start, end, others = parse_line(line)
+            promoter_positions.setdefault(start, []).append(WriteRule.START.value)
+            for pos in range(start + 1, end):
+                promoter_positions.setdefault(pos, []).append(WriteRule.MIDDLE.value)
+            promoter_positions.setdefault(end, []).append(WriteRule.END.value)
+    return promoter_positions
 
-                assert (
-                    open_brackets == close_brackets
-                ), f"Unmatched brackets in line {line_number}: {line}"
 
-    def test_fasta_data(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-
-        # Load the FASTA file
-        fasta_file = os.path.join(
-            INPUT_FASTA, "arabidopsis_test.fasta"
-        )  # Replace with your actual file name
-        with open(fasta_file, "r") as file:
-            fasta_data = file.read().splitlines()
-        fasta_data = [
-            line for line in fasta_data if not line.startswith(">")
-        ]  # Remove header lines
-        fasta_sequence = "".join(fasta_data)  # Concatenate to a single string
-
-        # Load the model data file
-        model_data_file = os.path.join(
-            model_data_folder, "arabidopsis_test.txt"
-        )  # Replace with your actual file name
-        with open(model_data_file, "r") as file:
-            model_data = file.read().splitlines()
-        model_data = [
-            line for line in model_data if not line.startswith("#")
-        ]  # Remove header lines
-        model_data_sequence = []
-        for line in model_data:
-            model_data_sequence.extend(process_model_data_line(line))
-
-        # Iterate over each row in the FASTA data and check the corresponding vectors in model data
-        for i, base in enumerate(fasta_sequence):
-            expected_pos = get_vector_for_base(base, bp_vector_schema)
-            vector_ = model_data_sequence[i]
-            # Assert that the expected position is set (i.e., has a value of 1)
-            assert (
-                vector_[expected_pos] == 1
-            ), f"Mismatch at position {i} for base {base}, expected position {expected_pos}"
-
-    def test_orf(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-        orf_output_folder: str = f"{OUTPUT_FOLDER}/orf_in_gff3"
-
-        # Load the ORF file
-        orf_output_file = os.path.join(orf_output_folder, "arabidopsis_test.txt")
-        with open(orf_output_file, "r") as file:
-            orf_data = file.readlines()[1:]
+def load_orf_data(orf_file_path: str) -> str:
+    with open(orf_file_path, "r") as file:
+        orf_data = file.readlines()[1:]
 
         # Parse the ORF file to extract ORF start and end positions where 'In_Gene' is not 0
         orf_positions = []
@@ -128,188 +76,239 @@ class TestModelData(unittest.TestCase):
                 orf_start, orf_end = int(parts[0]), int(parts[1])
                 orf_positions.append((orf_start, orf_end))
 
-        # Load the model data file
-        model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
-        with open(model_data_file, "r") as file:
-            model_data = file.read().splitlines()
-        model_data = [line for line in model_data if not line.startswith("#")]
-        model_data_sequence = []
-        for line in model_data:
-            model_data_sequence.extend(process_model_data_line(line))
+        return orf_positions
 
-        # Iterate over each sequence in the ORF data and check the corresponding vectors in model data
-        for start, end in orf_positions:
-            for i in range(start, end + 1):
-                vector_ = model_data_sequence[i - 1]
-                position_to_look: int = bp_vector_schema.index("ORF")
 
-                actual_rules = set(vector_[position_to_look])
+def load_fasta_data(fasta_file_path: str) -> str:
+    """Load and concatenate sequence data from a FASTA file, excluding headers."""
+    with open(fasta_file_path, "r") as file:
+        fasta_data = [line.strip() for line in file if not line.startswith(">")]
+    return "".join(fasta_data)
 
-                # Check for start and end rules
-                if i in [start_pos for start_pos, _ in orf_positions]:
-                    assert (
-                        1 in actual_rules
-                    ), f"ORF start rule not marked at position {i}"
-                if i in [end_pos for _, end_pos in orf_positions]:
-                    assert 3 in actual_rules, f"ORF end rule not marked at position {i}"
 
-                # Check for middle rule, considering overlapping ORFs
-                is_middle_position = any(
-                    start_pos < i < end_pos for start_pos, end_pos in orf_positions
-                )
-                if 2 in actual_rules:
-                    assert (
-                        is_middle_position
-                    ), f"ORF middle rule incorrectly marked at position {i}"
-                elif is_middle_position:
-                    assert (
-                        2 not in actual_rules
-                    ), f"Missing ORF middle rule at position {i}"
+def process_model_data_line(line: str) -> list:
+    """Process a single line of model data, splitting by tabs and processing each part."""
+    return [process_vector(part) for part in line.split("\t")]
 
-    def test_gff3(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-        gff3_output_folder: str = f"{OUTPUT_FOLDER}/gff3_positive_strand"
 
-        features_to_check: list[str] = [
-            "ORF",
-            "exon",
-            "mRNA",
-            "miRNA",
-            "rRNA",
-            "CDS",
-            "gene",
-        ]
+def process_vector(vector: str) -> list[int]:
+    processed_vector = [int(element) for element in ast.literal_eval(vector)]
+    return processed_vector
 
-        # Load the GFF3 file
-        gff3_file: str = os.path.join(gff3_output_folder, "arabidopsis_test.gff3")
-        feature_positions = {feature: [] for feature in features_to_check}
 
-        with open(gff3_file, "r") as file:
-            for line in file:
-                if line.startswith("#"):
-                    continue  # Skip header lines
-                parts = line.strip().split("\t")
-                feature_type, start, end = parts[2], int(parts[3]), int(parts[4])
-                if feature_type in features_to_check:
-                    feature_positions[feature_type].append((start, end))
+def load_model_data(model_data_file_path: str) -> list:
+    """Load model data from a file, excluding header lines, and split each line by tabs."""
+    vectors = []
+    with open(model_data_file_path, "r") as file:
+        # Exclude header lines and strip whitespace
+        for line in file:
+            if not line.startswith("#"):
+                [vectors.append(i) for i in process_model_data_line(line)]
+    # Process each line by splitting by tabs and processing each part
+    return vectors
 
-        # Load the model data file
-        model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
-        with open(model_data_file, "r") as file:
-            model_data = file.read().splitlines()
-        model_data = [line for line in model_data if not line.startswith("#")]
-        model_data_sequence = []
-        for line in model_data:
-            model_data_sequence.extend(process_model_data_line(line))
 
-        # Iterate over each feature type and their positions and test against model data
-        for feature in features_to_check:
-            position_to_look: int = bp_vector_schema.index(feature)
-            for start, end in feature_positions[feature]:
-                for i in range(start, end + 1):
-                    vector_ = model_data_sequence[
-                        i - 1
-                    ]  # Adjust for zero-based indexing
-                    actual_rules = vector_[position_to_look]
+def compare_sequences(fasta_sequence: str, model_data_sequence: list, bp_vector_schema: list):
+    """Assert that the FASTA sequence and model data sequence match according to the bp_vector_schema."""
+    for i, base in enumerate(fasta_sequence):
+        expected_pos = get_vector_for_base(base, bp_vector_schema)
+        vector_ = model_data_sequence[i]
+        assert vector_[expected_pos] == 1, f"Mismatch at position {i} for base {base}, expected position {expected_pos}"
 
-                    # Check if the actual rules list contains the expected rule
-                    expected_rule = (
-                        WriteRule.START.value
-                        if i == start
-                        else WriteRule.END.value
-                        if i == end
-                        else WriteRule.MIDDLE.value
-                    )
-                    assert (
-                        expected_rule in actual_rules
-                    ), f"Feature {feature} at position {i} expected rule {expected_rule}, found {actual_rules}, at vector_pos {position_to_look}, vector: {vector_}"
+
+def compare_orf_sequences(
+    orf_positions: list[tuple[int, int]], model_data_sequence: list[list[int]], bp_vector_schema: list[str]
+):
+    # Iterate over each sequence in the ORF data and check the corresponding vectors in model data
+    position_to_look: int = bp_vector_schema.index("ORF")
+    for start, end in orf_positions:
+        for i in range(start, end + 1):
+            vector_ = model_data_sequence[i]  # Access the vector at the current position
+
+            # Check the start of the ORF
+            if i == start:
+                assert (
+                    vector_[position_to_look] == WriteRule.START
+                ), f"Expected WriteRule.START at position {i}, got {vector_[position_to_look]}"
+            # Check the end of the ORF
+            elif i == end:
+                assert (
+                    vector_[position_to_look] == WriteRule.END
+                ), f"Expected WriteRule.END at position {i}, got {vector_[position_to_look]}"
+            # Check the middle of the ORF
+            else:
+                assert (
+                    vector_[position_to_look] == WriteRule.MIDDLE
+                ), f"Expected WriteRule.MIDDLE at position {i}, got {vector_[position_to_look]}"
+
+
+def compare_feature_sequences(promotor_positions, model_data_sequence, bp_vector_schema, position_to_check):
+
+    for index, vector in enumerate(model_data_sequence, start=1):  # Assuming 1-based indexing
+        actual_types = vector[position_to_check]
+        expected_types = promotor_positions.get(index, 0)
+
+        assert (
+            actual_types,
+            expected_types,
+            f"Mismatch at position {index}: vector: {vector} Expected {expected_types}, found {actual_types}",
+        )
+
+
+def test_model_data_factory(input_dir_path_fasta, input_dir_path_gff3, input_dir_path_orf, output_dir_path):
+    def _init(self, methodName="runTest"):
+        TestModelData.__init__(
+            self, methodName, input_dir_path_fasta, input_dir_path_gff3, input_dir_path_orf, output_dir_path
+        )
+
+    return type(f"TestModelData", (TestModelData,), {"__init__": _init})
+
+
+class TestModelData(unittest.TestCase):
+    def __init__(
+        self, methodName: str, input_dir_path_fasta, input_dir_path_gff3, input_dir_path_orf, output_dir_path: str
+    ):
+        super(TestModelData, self).__init__(methodName)
+        self.input_dir_path_fasta = input_dir_path_fasta
+        self.input_dir_path_gff3 = input_dir_path_gff3
+        self.input_dir_path_orf = input_dir_path_orf
+        self.output_dir_path = output_dir_path
+
+    def test_brackets(self):
+        model_data_folder: str = f"{self.output_dir_path}/model_data"
+        for filename in os.listdir(model_data_folder):
+            filepath = os.path.join(model_data_folder, filename)
+
+            with open(filepath, "r") as file:
+                line_number = 0
+                for line in file:
+                    line_number += 1
+                    if line.startswith("#"):
+                        continue  # Skip header lines
+
+                    # Count opening and closing brackets
+                    open_brackets = line.count("[")
+                    close_brackets = line.count("]")
+
+                    assert open_brackets == close_brackets, f"Unmatched brackets in line {line_number}: {line}"
+
+    def test_fasta_data(self):
+        model_data_folder = f"{self.output_dir_path}/model_data"
+
+        for filename in os.listdir(model_data_folder):
+            model_data_file_path = os.path.join(model_data_folder, filename)
+            file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
+
+            fasta_file_path = os.path.join(self.input_dir_path_fasta, f"{file_base}.fasta")
+            fasta_sequence = load_fasta_data(fasta_file_path)
+
+            bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
+            model_data_sequence = load_model_data(model_data_file_path)
+
+            compare_sequences(fasta_sequence, model_data_sequence, bp_vector_schema)
+
+    def test_orf(self):
+        model_data_folder = f"{self.output_dir_path}/model_data"
+        for filename in os.listdir(model_data_folder):
+            model_data_file_path = os.path.join(model_data_folder, filename)
+            file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
+
+            orf_file_path = os.path.join(f"{self.output_dir_path}/orf_in_gff3", f"{file_base}.txt")
+            orf_positions: list[tuple] = load_orf_data(orf_file_path)
+
+            bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
+            model_data_sequence = load_model_data(model_data_file_path)
+
+            compare_orf_sequences(orf_positions, model_data_sequence, bp_vector_schema)
 
     def test_promotor_motif(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-        promotor_output_folder: str = f"{OUTPUT_FOLDER}/homer2_annotation"
+        model_data_folder = f"{self.output_dir_path}/model_data"
+        promotor_output_folder: str = f"{self.output_dir_path}/homer2_annotation"
+        for filename in os.listdir(model_data_folder):
+            model_data_file_path = os.path.join(model_data_folder, filename)
+            file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
 
-        # Load the promoter data
-        promotor_file: str = os.path.join(
-            promotor_output_folder, "arabidopsis_test.txt"
-        )
-        promoter_positions = {}
-        with open(promotor_file, "r") as pf:
-            next(pf)  # Skip header
-            for line in pf:
-                start, end, others = parse_line(line)
-                promoter_positions.setdefault(start, []).append(WriteRule.START.value)
-                for pos in range(start + 1, end):
-                    promoter_positions.setdefault(pos, []).append(
-                        WriteRule.MIDDLE.value
-                    )
-                promoter_positions.setdefault(end, []).append(WriteRule.END.value)
+            promotor_file_path = os.path.join(promotor_output_folder, f"{file_base}.txt")
+            promotor_positions: list[tuple] = load_feature_data(promotor_file_path)
 
-        # Load the model data file
-        model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
-        with open(model_data_file, "r") as file:
-            model_data = [line for line in file if not line.startswith("#")]
+            bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
+            model_data_sequence = load_model_data(model_data_file_path)
+            position_to_check = bp_vector_schema.index("PROMOTOR_MOTIF")
 
-        # Process the model data
-        model_data_sequence = []
-        for line in model_data:
-            vectors = [eval(vector) for vector in line.strip().split("\t")]
-            model_data_sequence.extend(vectors)
-
-        position_to_check = bp_vector_schema.index("PROMOTOR_MOTIF")
-
-        for index, vector in enumerate(
-            model_data_sequence, start=1
-        ):  # Assuming 1-based indexing
-            actual_types = vector[position_to_check]
-            expected_types = promoter_positions.get(index, 0)
-
-            self.assertEqual(
-                actual_types,
-                expected_types,
-                f"Mismatch at position {index}: vector: {vector} Expected {expected_types}, found {actual_types}",
-            )
+            compare_feature_sequences(promotor_positions, model_data_sequence, bp_vector_schema, position_to_check)
 
     def test_poly_adenyl(self):
-        model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-        poly_adenylation_folder: str = f"{OUTPUT_FOLDER}/poly_adenylation"
+        model_data_folder = f"{self.output_dir_path}/model_data"
+        poly_adenylation_folder: str = f"{self.output_dir_path}/poly_adenylation"
 
-        # Load the polyadenylation data
-        poly_adenyl_file = os.path.join(poly_adenylation_folder, "arabidopsis_test.txt")
-        poly_adenyl_positions = {}
-        with open(poly_adenyl_file, "r") as pf:
-            next(pf)  # Skip header
-            for line in pf:
-                start, end, _ = parse_line(line)
-                poly_adenyl_positions.setdefault(start, []).append(
-                    WriteRule.START.value
-                )
-                for pos in range(start + 1, end):
-                    poly_adenyl_positions.setdefault(pos, []).append(
-                        WriteRule.MIDDLE.value
-                    )
-                poly_adenyl_positions.setdefault(end, []).append(WriteRule.END.value)
+        for filename in os.listdir(model_data_folder):
+            model_data_file_path = os.path.join(model_data_folder, filename)
+            file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
 
-        # Load the model data file
-        model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
-        with open(model_data_file, "r") as file:
-            model_data = [line for line in file if not line.startswith("#")]
+            poly_adenyl_file_path = os.path.join(poly_adenylation_folder, f"{file_base}.txt")
+            poly_adenyl_positions: dict[int, list[int]] = load_feature_data(poly_adenyl_file_path)
 
-        # Process the model data
-        model_data_sequence = []
-        for line in model_data:
-            vectors = [eval(vector) for vector in line.strip().split("\t")]
-            model_data_sequence.extend(vectors)
+            bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
+            model_data_sequence = load_model_data(model_data_file_path)
+            position_to_check = bp_vector_schema.index("POLY_ADENYL")
 
-        position_to_check = bp_vector_schema.index("POLY_ADENYL")
+            compare_feature_sequences(poly_adenyl_positions, model_data_sequence, bp_vector_schema, position_to_check)
 
-        for index, vector in enumerate(
-            model_data_sequence, start=1
-        ):  # Assuming 1-based indexing
-            actual_signal = vector[position_to_check]
-            expected_signal = poly_adenyl_positions.get(index, 0)
-
-            self.assertEqual(
-                actual_signal,
-                expected_signal,
-                f"Mismatch at position {index}: Expected {expected_signal}, found {actual_signal}",
-            )
+    # def test_gff3(self):
+    #     model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
+    #     gff3_output_folder: str = f"{OUTPUT_FOLDER}/gff3_positive_strand"
+    #
+    #     features_to_check: list[str] = [
+    #         "ORF",
+    #         "exon",
+    #         "mRNA",
+    #         "miRNA",
+    #         "rRNA",
+    #         "CDS",
+    #         "gene",
+    #     ]
+    #
+    #     # Load the GFF3 file
+    #     gff3_file: str = os.path.join(gff3_output_folder, "arabidopsis_test.gff3")
+    #     feature_positions = {feature: [] for feature in features_to_check}
+    #
+    #     with open(gff3_file, "r") as file:
+    #         for line in file:
+    #             if line.startswith("#"):
+    #                 continue  # Skip header lines
+    #             parts = line.strip().split("\t")
+    #             feature_type, start, end = parts[2], int(parts[3]), int(parts[4])
+    #             if feature_type in features_to_check:
+    #                 feature_positions[feature_type].append((start, end))
+    #
+    #     # Load the model data file
+    #     model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
+    #     with open(model_data_file, "r") as file:
+    #         model_data = file.read().splitlines()
+    #     model_data = [line for line in model_data if not line.startswith("#")]
+    #     model_data_sequence = []
+    #     for line in model_data:
+    #         model_data_sequence.extend(process_model_data_line(line))
+    #
+    #     # Iterate over each feature type and their positions and test against model data
+    #     for feature in features_to_check:
+    #         position_to_look: int = bp_vector_schema.index(feature)
+    #         for start, end in feature_positions[feature]:
+    #             for i in range(start, end + 1):
+    #                 vector_ = model_data_sequence[
+    #                     i - 1
+    #                 ]  # Adjust for zero-based indexing
+    #                 actual_rules = vector_[position_to_look]
+    #
+    #                 # Check if the actual rules list contains the expected rule
+    #                 expected_rule = (
+    #                     WriteRule.START.value
+    #                     if i == start
+    #                     else WriteRule.END.value
+    #                     if i == end
+    #                     else WriteRule.MIDDLE.value
+    #                 )
+    #                 assert (
+    #                     expected_rule in actual_rules
+    #                 ), f"Feature {feature} at position {i} expected rule {expected_rule}, found {actual_rules}, at vector_pos {position_to_look}, vector: {vector_}"
+    #

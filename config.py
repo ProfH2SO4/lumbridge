@@ -16,7 +16,7 @@ HOMER2_CPU_CORES = 4
 
 
 # model_data
-MAX_FEATURE_OVERLAP = 1  # for given feature
+MAX_FEATURE_OVERLAP = 1  # for given feature, fow now it's tested only for 1
 
 
 LOG_CONFIG = {
