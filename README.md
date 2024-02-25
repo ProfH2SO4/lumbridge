@@ -151,6 +151,9 @@ This is a straightforward way to change settings if you don't require a separate
 By default, the application uses test data from *Arabidopsis Thaliana*. This dataset serves as a standard reference
 for initial runs and testing purposes. You can replace it with your specific data in the configuration settings.
 
+#### Tests
+The tests are testing output of the Pipeline. Just provide your input and output paths
+in `tests/test_config.py` and run `run_tests.py`.
 
 ## Project Workflow
 
