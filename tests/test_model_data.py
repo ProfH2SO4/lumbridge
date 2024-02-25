@@ -64,18 +64,50 @@ def load_feature_data(path_promotor_file: str) -> dict:
     return promoter_positions
 
 
-def load_orf_data(orf_file_path: str) -> str:
-    with open(orf_file_path, "r") as file:
-        orf_data = file.readlines()[1:]
+def load_gff3_data(gff3_file: str, bp_vector_schema: list[str], max_overlap: int) -> dict:
+    feature_pos: dict[str, list] = {}
 
+    def is_overlap_allowed(
+        existing_intervals: list[tuple[int, int]], new_interval: tuple[int, int], max_overlap: int
+    ) -> bool:
+        """Check if the new interval overlaps with existing intervals more than the allowed max_overlap."""
+        start_new, end_new = new_interval
+        for start_existing, end_existing in existing_intervals:
+            # Calculate overlap
+            overlap = min(end_existing, end_new) - max(start_existing, start_new) + 1
+            # If overlap is more than max_overlap, return False
+            if overlap > max_overlap:
+                return False
+        return True
+
+    with open(gff3_file, "r") as file:
+        for line in file:
+            if line.startswith("#"):
+                continue  # Skip header lines
+            parts = line.strip().split("\t")
+            feature_type, start, end = parts[2], int(parts[3]), int(parts[4])
+            if feature_type in bp_vector_schema:
+                new_interval = (start, end)
+                # Only append the new interval if it's allowed
+                if is_overlap_allowed(feature_pos.setdefault(feature_type, []), new_interval, max_overlap):
+                    feature_pos[feature_type].append(new_interval)
+
+    return feature_pos
+
+
+def load_orf_data(orf_file_path: str) -> dict[int, list[int]]:
+    orf_positions = {}
+    with open(orf_file_path, "r") as file:
+        next(file)  # Skip header
         # Parse the ORF file to extract ORF start and end positions where 'In_Gene' is not 0
-        orf_positions = []
-        for line in orf_data:
+        for line in file:
             parts = line.strip().split("\t")
             if parts[-1] != "0":
-                orf_start, orf_end = int(parts[0]), int(parts[1])
-                orf_positions.append((orf_start, orf_end))
-
+                start, end = int(parts[0]), int(parts[1])
+                orf_positions.setdefault(start, []).append(WriteRule.START.value)
+                for pos in range(start + 1, end):
+                    orf_positions.setdefault(pos, []).append(WriteRule.MIDDLE.value)
+                orf_positions.setdefault(end, []).append(WriteRule.END.value)
         return orf_positions
 
 
@@ -116,43 +148,35 @@ def compare_sequences(fasta_sequence: str, model_data_sequence: list, bp_vector_
         assert vector_[expected_pos] == 1, f"Mismatch at position {i} for base {base}, expected position {expected_pos}"
 
 
-def compare_orf_sequences(
-    orf_positions: list[tuple[int, int]], model_data_sequence: list[list[int]], bp_vector_schema: list[str]
-):
-    # Iterate over each sequence in the ORF data and check the corresponding vectors in model data
-    position_to_look: int = bp_vector_schema.index("ORF")
-    for start, end in orf_positions:
-        for i in range(start, end + 1):
-            vector_ = model_data_sequence[i]  # Access the vector at the current position
-
-            # Check the start of the ORF
-            if i == start:
-                assert (
-                    vector_[position_to_look] == WriteRule.START
-                ), f"Expected WriteRule.START at position {i}, got {vector_[position_to_look]}"
-            # Check the end of the ORF
-            elif i == end:
-                assert (
-                    vector_[position_to_look] == WriteRule.END
-                ), f"Expected WriteRule.END at position {i}, got {vector_[position_to_look]}"
-            # Check the middle of the ORF
-            else:
-                assert (
-                    vector_[position_to_look] == WriteRule.MIDDLE
-                ), f"Expected WriteRule.MIDDLE at position {i}, got {vector_[position_to_look]}"
-
-
-def compare_feature_sequences(promotor_positions, model_data_sequence, bp_vector_schema, position_to_check):
-
-    for index, vector in enumerate(model_data_sequence, start=1):  # Assuming 1-based indexing
+def compare_feature_sequences(positions: dict[int, list[int]], model_data_sequence, position_to_check):
+    for index, vector in enumerate(model_data_sequence, start=0):  # Assuming 1-based indexing
         actual_types = vector[position_to_check]
-        expected_types = promotor_positions.get(index, 0)
-
+        expected_types = positions.get(index, 0)
+        if isinstance(expected_types, list):  # when found in positions
+            expected_types = expected_types[0]
         assert (
-            actual_types,
-            expected_types,
-            f"Mismatch at position {index}: vector: {vector} Expected {expected_types}, found {actual_types}",
-        )
+            actual_types == expected_types
+        ), f"Mismatch at position {index}: vector: {vector} Expected {expected_types}, found {actual_types}"
+
+
+def compare_gff3_sequences(features_pos: dict[str, list], model_data_sequence, bp_vector_schema: list[str]):
+    # Iterate over each feature type and their positions and test against model data
+    for feature, pos in features_pos.items():
+        position_to_look: int = bp_vector_schema.index(feature)
+        for start, end in pos:
+            for i in range(start, end + 1):
+                vector_ = model_data_sequence[i]
+                actual_rules = vector_[position_to_look]
+
+                # Check if the actual rules list contains the expected rule
+                expected_rule = (
+                    WriteRule.START.value if i == start else WriteRule.END.value if i == end else WriteRule.MIDDLE.value
+                )
+                if isinstance(expected_rule, list):
+                    expected_rule = expected_rule[0]
+                assert (
+                    expected_rule == actual_rules
+                ), f"Feature {feature} at position {i} expected rule {expected_rule}, found {actual_rules}, at vector_pos {position_to_look}, vector: {vector_}"
 
 
 def test_model_data_factory(input_dir_path_fasta, input_dir_path_gff3, input_dir_path_orf, output_dir_path):
@@ -214,12 +238,12 @@ class TestModelData(unittest.TestCase):
             file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
 
             orf_file_path = os.path.join(f"{self.output_dir_path}/orf_in_gff3", f"{file_base}.txt")
-            orf_positions: list[tuple] = load_orf_data(orf_file_path)
+            orf_positions: dict[int, list[int]] = load_orf_data(orf_file_path)
 
             bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
             model_data_sequence = load_model_data(model_data_file_path)
-
-            compare_orf_sequences(orf_positions, model_data_sequence, bp_vector_schema)
+            position_to_check = bp_vector_schema.index("ORF")
+            compare_feature_sequences(orf_positions, model_data_sequence, position_to_check)
 
     def test_promotor_motif(self):
         model_data_folder = f"{self.output_dir_path}/model_data"
@@ -229,13 +253,13 @@ class TestModelData(unittest.TestCase):
             file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
 
             promotor_file_path = os.path.join(promotor_output_folder, f"{file_base}.txt")
-            promotor_positions: list[tuple] = load_feature_data(promotor_file_path)
+            promotor_positions: dict = load_feature_data(promotor_file_path)
 
             bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
             model_data_sequence = load_model_data(model_data_file_path)
             position_to_check = bp_vector_schema.index("PROMOTOR_MOTIF")
 
-            compare_feature_sequences(promotor_positions, model_data_sequence, bp_vector_schema, position_to_check)
+            compare_feature_sequences(promotor_positions, model_data_sequence, position_to_check)
 
     def test_poly_adenyl(self):
         model_data_folder = f"{self.output_dir_path}/model_data"
@@ -252,63 +276,20 @@ class TestModelData(unittest.TestCase):
             model_data_sequence = load_model_data(model_data_file_path)
             position_to_check = bp_vector_schema.index("POLY_ADENYL")
 
-            compare_feature_sequences(poly_adenyl_positions, model_data_sequence, bp_vector_schema, position_to_check)
+            compare_feature_sequences(poly_adenyl_positions, model_data_sequence, position_to_check)
 
-    # def test_gff3(self):
-    #     model_data_folder: str = f"{OUTPUT_FOLDER}/model_data"
-    #     gff3_output_folder: str = f"{OUTPUT_FOLDER}/gff3_positive_strand"
-    #
-    #     features_to_check: list[str] = [
-    #         "ORF",
-    #         "exon",
-    #         "mRNA",
-    #         "miRNA",
-    #         "rRNA",
-    #         "CDS",
-    #         "gene",
-    #     ]
-    #
-    #     # Load the GFF3 file
-    #     gff3_file: str = os.path.join(gff3_output_folder, "arabidopsis_test.gff3")
-    #     feature_positions = {feature: [] for feature in features_to_check}
-    #
-    #     with open(gff3_file, "r") as file:
-    #         for line in file:
-    #             if line.startswith("#"):
-    #                 continue  # Skip header lines
-    #             parts = line.strip().split("\t")
-    #             feature_type, start, end = parts[2], int(parts[3]), int(parts[4])
-    #             if feature_type in features_to_check:
-    #                 feature_positions[feature_type].append((start, end))
-    #
-    #     # Load the model data file
-    #     model_data_file = os.path.join(model_data_folder, "arabidopsis_test.txt")
-    #     with open(model_data_file, "r") as file:
-    #         model_data = file.read().splitlines()
-    #     model_data = [line for line in model_data if not line.startswith("#")]
-    #     model_data_sequence = []
-    #     for line in model_data:
-    #         model_data_sequence.extend(process_model_data_line(line))
-    #
-    #     # Iterate over each feature type and their positions and test against model data
-    #     for feature in features_to_check:
-    #         position_to_look: int = bp_vector_schema.index(feature)
-    #         for start, end in feature_positions[feature]:
-    #             for i in range(start, end + 1):
-    #                 vector_ = model_data_sequence[
-    #                     i - 1
-    #                 ]  # Adjust for zero-based indexing
-    #                 actual_rules = vector_[position_to_look]
-    #
-    #                 # Check if the actual rules list contains the expected rule
-    #                 expected_rule = (
-    #                     WriteRule.START.value
-    #                     if i == start
-    #                     else WriteRule.END.value
-    #                     if i == end
-    #                     else WriteRule.MIDDLE.value
-    #                 )
-    #                 assert (
-    #                     expected_rule in actual_rules
-    #                 ), f"Feature {feature} at position {i} expected rule {expected_rule}, found {actual_rules}, at vector_pos {position_to_look}, vector: {vector_}"
-    #
+    def test_gff3(self):
+        model_data_folder = f"{self.output_dir_path}/model_data"
+        gff3_output_folder: str = f"{self.output_dir_path}/gff3_positive_strand"
+
+        for filename in os.listdir(model_data_folder):
+            model_data_file_path = os.path.join(model_data_folder, filename)
+            file_base = filename[:-4]  # Assuming the extension is always 4 characters long, e.g., .txt
+
+            bp_vector_schema = extract_bp_vector_schema(model_data_file_path)
+
+            gff3_output_file_path = os.path.join(gff3_output_folder, f"{file_base}.gff3")
+            feature_positions: dict[str, list[tuple]] = load_gff3_data(gff3_output_file_path, bp_vector_schema, 0)
+
+            model_data_sequence = load_model_data(model_data_file_path)
+            compare_gff3_sequences(feature_positions, model_data_sequence, bp_vector_schema)

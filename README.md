@@ -201,7 +201,7 @@ The header section encapsulates critical metadata about the file, including the 
 #bp_vector_schema=['A', 'C', 'G', 'T', 'PROMOTOR_MOTIF', 'ORF', 'POLY_ADENYL', 'miRNA', 'rRNA', 'gene']
 #description of nucleotide:A=[1, 0, 0, 0], C=[0, 1, 0, 0], G=[0, 0, 1, 0], T=[0, 0, 0, 1]
 #description of feature:0=no_present, 1=start, 2=continuation/ongoing, 3=end
-#max_feature_overlap=1
+#max_feature_overlap=0
 ####END####
 ```
 
@@ -212,12 +212,12 @@ The first four positions of the vector represent the nucleotides (A, C, G, T).
 The parameter `max_feature_overlap` is responsible for the maximum overlap for the given feature.
 With a higher number of `max_feature_overlap`, the size of the vector also increases.
 
-For example, with `max_feature_overlap=1`:
+For example, with `max_feature_overlap=0`:
 
 - [1, 0, 0, 0, 0, 0, 0, 0, 0, 3]
   This vector indicates that there is Adenine and the end of a gene.
 
-For example, with `max_feature_overlap=2`:
+For example, with `max_feature_overlap=1`:
 
 - [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3]
   This vector indicates that it is Cytosine and at the end (the last 2 elements: `2, 3`), one gene is ongoing and the other ends.

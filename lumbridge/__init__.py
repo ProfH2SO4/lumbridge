@@ -28,7 +28,7 @@ def compile_config(app_config: ModuleType, path: str):
         raise e from e
 
 
-def load_config(test_config_path: None | str) -> ModuleType:
+def load_config() -> ModuleType:
     """
     Load local config.py.
     If exists config.py in /etc/lumbridge/ then overrides parameters in local config.py.
@@ -37,12 +37,10 @@ def load_config(test_config_path: None | str) -> ModuleType:
     app_config: ModuleType = config
     path: str = "/etc/lumbridge/config.py"
 
-    if not isfile(path) and not test_config_path:
+    if not isfile(path):
         return app_config
     if isfile(path):
         compile_config(app_config, path)
-    if test_config_path:
-        compile_config(app_config, test_config_path)
     return app_config
 
 
@@ -71,10 +69,10 @@ def create_file_if_not_exists(path_to_file: str) -> None:
             pass  # Create an empty file
 
 
-def run(test_config: str | None = None) -> None:
+def run() -> None:
     print("------ Start  -------")
     # Load Config
-    config_: ModuleType = load_config(test_config)
+    config_: ModuleType = load_config()
     parsed_config: dict[str, any] = parse_namespace(config_)
 
     print("============ Setting Up Logger ============")
@@ -106,15 +104,15 @@ def run(test_config: str | None = None) -> None:
     find_poly_adi_sequences(parsed_config["INPUT_FASTA"], parsed_config["OUTPUT_FOLDER"])
 
     log.info("------ Make homer2 output -------")
-    # make_homer2_output(
-    #     parsed_config["HOMER2_BIN_PATH"],
-    #     parsed_config["INPUT_FASTA"],
-    #     gff3_folder_pos_strand,
-    #     parsed_config["HOMER2_OUTPUT_FOLDER"],
-    #     parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
-    #     parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
-    #     cpu_cores=parsed_config["HOMER2_CPU_CORES"],
-    # )
+    make_homer2_output(
+        parsed_config["HOMER2_BIN_PATH"],
+        parsed_config["INPUT_FASTA"],
+        gff3_folder_pos_strand,
+        parsed_config["HOMER2_OUTPUT_FOLDER"],
+        parsed_config["HOMER2_UPSTREAM_GEN_SEQ_LENGTH"],
+        parsed_config["HOMER2_DOWNSTREAM_GEN_SEQ_LENGTH"],
+        cpu_cores=parsed_config["HOMER2_CPU_CORES"],
+    )
 
     log.info("------ Annotate homer2 output to fasta -------")
     annotate_homer2_motifs(
@@ -133,7 +131,7 @@ def run(test_config: str | None = None) -> None:
         gff3_folder=gff3_folder_pos_strand,
         orf_folder=orf_in_gff3_folder,
         promotor_motifs_folder=f"{parsed_config['OUTPUT_FOLDER']}/homer2_annotation",
-        poly_adenyl_folder=f"{parsed_config['OUTPUT_FOLDER']}/poly_adenylation",
+        poly_a_folder=f"{parsed_config['OUTPUT_FOLDER']}/poly_adenylation",
         output_folder=f"{parsed_config['OUTPUT_FOLDER']}/model_data",
         max_feature_overlap=parsed_config["MAX_FEATURE_OVERLAP"],
         gff3_features=parsed_config["GFF3_FEATURES"],
