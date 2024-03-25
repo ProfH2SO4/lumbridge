@@ -4,7 +4,7 @@ INPUT_ORF = "./test_data/orf_folder"
 OUTPUT_FOLDER = "./lumbridge_output"
 
 # features to extract from gff3
-GFF3_FEATURES = ["miRNA", "rRNA", "gene"]
+GFF3_FEATURES = ["miRNA", "lnc_RNA", "gene"]
 
 # Homer2
 HOMER2_BIN_PATH = "/usr/src/app/bin"
